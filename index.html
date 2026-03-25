@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Student Bank Manager</title>
+<meta name="theme-color" content="#1A3A5C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Student Bank">
+<meta name="description" content="School savings bank management — students, transactions, reports">
+<meta name="mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- GLOBAL LOADING OVERLAY — shown during initial auth check -->
+<div class="app-loading" id="app-loading">
+  <div class="app-loading-logo">Student <span>Bank</span></div>
+  <div class="app-loading-sub">Loading…</div>
+  <div class="app-loading-spinner"></div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div id="auth-welcome" class="auth-view active">
+    <div class="auth-brand">
+      <div class="auth-logo">Student <span>Bank</span></div>
+      <div class="auth-tagline">School Savings Management</div>
+      <div class="auth-school-tag">🏫 Z.P. Highschool · Omerga</div>
+    </div>
+    <div class="welcome-split">
+      <button class="welcome-card student" onclick="showAuthView('student-login')">
+        <span class="welcome-card-icon">🎓</span>
+        <div class="welcome-card-title">Student Login</div>
+        <div class="welcome-card-sub">Check your balance, passbook &amp; savings badges</div>
+      </button>
+      <button class="welcome-card teacher" onclick="showAuthView('login')">
+        <span class="welcome-card-icon">👩‍🏫</span>
+        <div class="welcome-card-title">Teacher / Manager</div>
+        <div class="welcome-card-sub">Manage accounts, record transactions &amp; reports</div>
+      </button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-auth-outline" style="flex:1;margin-top:0;font-size:.82rem;" onclick="showAuthView('create')">🏫 New School</button>
+        <button class="btn-auth-outline" style="flex:1;margin-top:0;font-size:.82rem;" onclick="showAuthView('join')">➕ Join School</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="auth-student-login" class="auth-view">
+    <button class="auth-back" onclick="showAuthView('welcome')">← Back</button>
+    <div class="auth-brand" style="margin-bottom:18px;">
+      <div class="auth-logo" style="font-size:1.8rem;color:#6EE7B7;">Student <span style="color:var(--gold-l)">Bank</span></div>
+      <div class="auth-tagline">Student Login</div>
+    </div>
+    <div class="auth-card">
+      <h3>🎓 Student Login</h3>
+      <label class="auth-label">School Code</label>
+      <input type="text" id="sl-school" class="auth-input" placeholder="6-character school code (ask teacher)" style="text-transform:uppercase;letter-spacing:.12em;" maxlength="6" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')document.getElementById('sl-account').focus()">
+      <label class="auth-label">Account Number</label>
+      <input type="text" id="sl-account" class="auth-input" placeholder="e.g. SB001" style="text-transform:uppercase;letter-spacing:.08em;" maxlength="20" onkeydown="if(event.key==='Enter')document.getElementById('sl-pin').focus()">
+      <label class="auth-label" id="sl-pin-label">4-Digit PIN</label>
+      <input type="password" inputmode="numeric" maxlength="4" id="sl-pin" class="auth-input" placeholder="••••" style="letter-spacing:.3em;font-size:1.2rem;text-align:center;" onkeydown="if(event.key==='Enter')studentLogin()">
+      <div class="auth-error" id="sl-error"></div>
+      <button class="btn-auth-primary" id="sl-btn" onclick="studentLogin()" style="background:linear-gradient(135deg,#2A7A54,#1A5E3F);">Login →</button>
+      <div id="sl-setpin-section" style="display:none;margin-top:12px;">
+        <div style="height:1px;background:rgba(255,255,255,.12);margin-bottom:12px;"></div>
+        <label class="auth-label">Set New PIN (first time)</label>
+        <input type="password" inputmode="numeric" maxlength="4" id="sl-newpin" class="auth-input" placeholder="Choose 4-digit PIN" style="letter-spacing:.3em;font-size:1.1rem;text-align:center;">
+        <input type="password" inputmode="numeric" maxlength="4" id="sl-newpin2" class="auth-input" placeholder="Confirm PIN" style="letter-spacing:.3em;font-size:1.1rem;text-align:center;">
+        <button class="btn-auth-primary" onclick="studentSetPin()" style="background:linear-gradient(135deg,#2A7A54,#1A5E3F);">✅ Set PIN &amp; Login</button>
+      </div>
+      <p class="auth-note" style="margin-top:12px;">School Code &amp; Account Number are on your QR card. Ask your teacher if you need help.</p>
+    </div>
+  </div>
+
+  <div id="auth-login" class="auth-view">
+    <button class="auth-back" onclick="showAuthView('welcome')">← Back</button>
+    <div class="auth-brand" style="margin-bottom:18px;"><div class="auth-logo" style="font-size:1.8rem;">Student <span>Bank</span></div></div>
+    <div class="auth-card">
+      <h3>Teacher Login</h3>
+      <label class="auth-label">Email Address</label>
+      <input type="email" id="login-email" class="auth-input" placeholder="teacher@school.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('login-pwd').focus()">
+      <label class="auth-label">Password</label>
+      <input type="password" id="login-pwd" class="auth-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')loginTeacher()">
+      <div class="auth-error" id="login-error"></div>
+      <button class="btn-auth-primary" id="login-btn" onclick="loginTeacher()">Login →</button>
+      <div style="text-align:center;margin-top:12px;"><button class="auth-link" onclick="forgotPassword()">Forgot password?</button></div>
+    </div>
+  </div>
+
+  <div id="auth-create" class="auth-view">
+    <button class="auth-back" onclick="showAuthView('welcome')">← Back</button>
+    <div class="auth-brand" style="margin-bottom:18px;"><div class="auth-logo" style="font-size:1.8rem;">Create <span>School</span></div></div>
+    <div class="auth-card">
+      <h3>🏫 New School Setup</h3>
+      <label class="auth-label">School Full Name *</label>
+      <input type="text" id="create-school-name" class="auth-input" placeholder="e.g. Z.P. Highschool Omerga">
+      <label class="auth-label">Your Name (Manager) *</label>
+      <input type="text" id="create-teacher-name" class="auth-input" placeholder="Full name" autocomplete="name">
+      <label class="auth-label">Email Address *</label>
+      <input type="email" id="create-email" class="auth-input" placeholder="your@email.com" autocomplete="email">
+      <label class="auth-label">Password *</label>
+      <input type="password" id="create-pwd" class="auth-input" placeholder="Min. 6 characters" autocomplete="new-password">
+      <label class="auth-label">Confirm Password *</label>
+      <input type="password" id="create-confirm-pwd" class="auth-input" placeholder="Re-enter password" onkeydown="if(event.key==='Enter')createSchool()">
+      <div class="auth-error" id="create-error"></div>
+      <button class="btn-auth-primary" id="create-btn" onclick="createSchool()">Create School →</button>
+      <p class="auth-note">You become the <span>Manager</span> — share the invite code with your teachers.</p>
+    </div>
+  </div>
+
+  <div id="auth-join" class="auth-view">
+    <button class="auth-back" onclick="showAuthView('welcome')">← Back</button>
+    <div class="auth-brand" style="margin-bottom:18px;"><div class="auth-logo" style="font-size:1.8rem;">Join <span>School</span></div></div>
+    <div class="auth-card">
+      <h3>👩‍🏫 Join as Teacher</h3>
+      <label class="auth-label">School Code *</label>
+      <input type="text" id="join-school-code" class="auth-input" placeholder="6-character school code" style="text-transform:uppercase;letter-spacing:.12em;" maxlength="6">
+      <label class="auth-label">Invite Code *</label>
+      <input type="text" id="join-invite-code" class="auth-input" placeholder="Invite code from your manager" style="text-transform:uppercase;letter-spacing:.12em;" maxlength="8">
+      <label class="auth-label">Your Name *</label>
+      <input type="text" id="join-teacher-name" class="auth-input" placeholder="Full name" autocomplete="name">
+      <label class="auth-label">Email Address *</label>
+      <input type="email" id="join-email" class="auth-input" placeholder="your@email.com" autocomplete="email">
+      <label class="auth-label">Password *</label>
+      <input type="password" id="join-pwd" class="auth-input" placeholder="Min. 6 characters" autocomplete="new-password">
+      <label class="auth-label">Confirm Password *</label>
+      <input type="password" id="join-confirm-pwd" class="auth-input" placeholder="Re-enter password" onkeydown="if(event.key==='Enter')joinSchool()">
+      <div class="auth-error" id="join-error"></div>
+      <button class="btn-auth-primary" id="join-btn" onclick="joinSchool()">Join School →</button>
+      <p class="auth-note">Get the <span>School Code</span> &amp; <span>Invite Code</span> from your manager.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PIN LOCK SCREEN -->
+<div id="pin-screen">
+  <div class="pin-logo">Student <span>Bank</span></div>
+  <div class="pin-sub" id="pin-sub">Enter your PIN to continue</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-grid">
+    <button class="pin-key" onclick="pinKey('1')">1</button><button class="pin-key" onclick="pinKey('2')">2</button><button class="pin-key" onclick="pinKey('3')">3</button>
+    <button class="pin-key" onclick="pinKey('4')">4</button><button class="pin-key" onclick="pinKey('5')">5</button><button class="pin-key" onclick="pinKey('6')">6</button>
+    <button class="pin-key" onclick="pinKey('7')">7</button><button class="pin-key" onclick="pinKey('8')">8</button><button class="pin-key" onclick="pinKey('9')">9</button>
+    <div class="pin-key empty"></div><button class="pin-key" onclick="pinKey('0')">0</button><button class="pin-key del" onclick="pinDel()">⌫</button>
+  </div>
+  <div class="pin-err" id="pin-err"></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:18px;">
+    <button class="pin-forgot" id="pin-forgot-btn" onclick="pinForgot()" style="display:block;">Forgot PIN? Log out</button>
+    <div id="pin-setup-btn" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- STUDENT BALANCE VIEW -->
+<div id="balance-view-screen">
+  <button class="bv-close" onclick="closeBalanceView()">✕</button>
+  <div class="bv-logo">Student <span style="color:var(--gold-l)">Bank</span></div>
+  <div class="bv-card">
+    <div class="bv-name" id="bv-name">—</div>
+    <div class="bv-acc" id="bv-acc">—</div>
+    <div class="bv-balance" id="bv-balance">₹0</div>
+    <div class="bv-label">Current Balance</div>
+    <div class="bv-stats">
+      <div class="bv-stat"><div class="bv-stat-val" id="bv-deps">₹0</div><div class="bv-stat-lbl">Deposited</div></div>
+      <div class="bv-stat"><div class="bv-stat-val" id="bv-wds">₹0</div><div class="bv-stat-lbl">Withdrawn</div></div>
+    </div>
+    <div class="bv-school" id="bv-school"></div>
+  </div>
+</div>
+
+<div id="print-area"></div>
+
+<!-- ════════════ STUDENT PORTAL ════════════ -->
+<div id="student-portal">
+  <div id="sp-view-home" style="flex:1;overflow-y:auto;padding-bottom:90px;">
+    <div class="sp-header">
+      <div class="sp-school" id="sp-school-name"></div>
+      <div class="sp-name" id="sp-student-name">—</div>
+      <div class="sp-acc" id="sp-student-acc"></div>
+      <div class="sp-bal-label">Current Balance</div>
+      <div class="sp-balance" id="sp-balance">₹0</div>
+      <div class="sp-class-badge" id="sp-class-badge"></div>
+    </div>
+    <div class="sp-goal-card" id="sp-goal-card">
+      <div class="sp-goal-title"><span>🎯 Savings Goal</span><span id="sp-goal-pct" style="font-size:.84rem;font-weight:800;color:var(--green)">0%</span></div>
+      <div class="sp-goal-bar-bg"><div class="sp-goal-bar-fill" id="sp-goal-fill" style="width:0%"></div></div>
+      <div class="sp-goal-sub" id="sp-goal-sub"></div>
+    </div>
+    <div style="padding:15px 16px 5px;"><div style="font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);">🏅 Your Badges</div></div>
+    <div class="sp-badges-row" id="sp-badges-row"></div>
+    <div style="padding:10px 16px 6px;font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);">Recent Transactions</div>
+    <div id="sp-recent-txns" style="padding:0 14px;"></div>
+  </div>
+
+  <div id="sp-view-passbook" style="display:none;flex:1;overflow-y:auto;padding-bottom:90px;">
+    <div class="sp-passbook-header">
+      <div class="sp-pb-name" id="sp-pb-name">—</div>
+      <div class="sp-pb-meta" id="sp-pb-meta"></div>
+      <div class="sp-pb-balrow">
+        <div class="sp-pb-stat"><div class="sp-pb-stat-val" id="sp-pb-deps">₹0</div><div class="sp-pb-stat-lbl">Total Saved</div></div>
+        <div class="sp-pb-stat"><div class="sp-pb-stat-val" id="sp-pb-wds">₹0</div><div class="sp-pb-stat-lbl">Withdrawn</div></div>
+        <div class="sp-pb-stat"><div class="sp-pb-stat-val" id="sp-pb-bal">₹0</div><div class="sp-pb-stat-lbl">Balance</div></div>
+      </div>
+    </div>
+    <div class="sp-chart-wrap"><div class="sp-chart-card"><div class="sp-chart-title">Monthly Savings</div><div id="sp-monthly-chart"></div></div></div>
+    <div style="padding:12px 14px 6px;"><button onclick="printStudentPassbook()" style="width:100%;background:linear-gradient(135deg,#2A7A54,#1A5E3F);color:#fff;border:none;border-radius:14px;padding:14px;font-size:.92rem;font-weight:800;cursor:pointer;font-family:var(--font-body);">🖨 Print My Passbook</button></div>
+    <div style="padding:10px 16px 5px;font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);">Full History</div>
+    <div id="sp-full-txns" style="padding:0 14px 14px;"></div>
+  </div>
+
+  <!-- NEW: CHALLENGE VIEW -->
+  <div id="sp-view-challenge" style="display:none;flex:1;overflow-y:auto;padding-bottom:90px;">
+    <div class="sp-challenge-header">
+      <div class="sp-school" id="sp-ch-school"></div>
+      <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;margin-bottom:3px;">🏆 Savings Challenge</div>
+      <div style="font-size:.76rem;opacity:.6;font-weight:600;">Keep your streak alive every week!</div>
+    </div>
+    <div style="padding:20px 16px 6px;text-align:center;">
+      <div class="sp-streak-circle" id="sp-streak-circle">
+        <div class="sp-streak-num" id="sp-streak-num">0</div>
+        <div class="sp-streak-lbl">Week Streak</div>
+      </div>
+      <div style="font-size:.73rem;color:var(--muted);margin-top:6px;font-weight:600;" id="sp-streak-msg">Make a deposit this week to start your streak!</div>
+    </div>
+    <div style="background:var(--white);border-radius:var(--r-lg);margin:0 14px 13px;padding:14px 15px;box-shadow:var(--sh-xs);border:1px solid var(--border-l);">
+      <div style="font-size:.69rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">This Month — Weekly Activity</div>
+      <div class="sp-week-grid" id="sp-week-grid"></div>
+      <div style="font-size:.68rem;color:var(--muted);margin-top:6px;font-weight:600;text-align:center;" id="sp-month-dep-total"></div>
+    </div>
+    <div style="padding:0 14px 6px;font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);">🎯 Milestones</div>
+    <div id="sp-milestones-list" style="padding:0 14px 14px;"></div>
+  </div>
+
+  <!-- NEW: FEE DUES VIEW -->
+  <div id="sp-view-fees" style="display:none;flex:1;overflow-y:auto;padding-bottom:90px;">
+    <div class="sp-fee-header">
+      <div class="sp-school" id="sp-fee-school"></div>
+      <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;margin-bottom:3px;">📚 Fee Status</div>
+      <div style="font-size:.76rem;opacity:.6;font-weight:600;">Your fee payment history</div>
+    </div>
+    <div style="padding:14px 14px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:-14px;position:relative;z-index:1;">
+      <div style="background:var(--white);border-radius:14px;padding:12px 10px;box-shadow:var(--sh);text-align:center;border:1px solid var(--border-l);"><div style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--green);" id="sp-fee-paid-count">0</div><div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800;margin-top:3px;">Paid</div></div>
+      <div style="background:var(--white);border-radius:14px;padding:12px 10px;box-shadow:var(--sh);text-align:center;border:1px solid var(--border-l);"><div style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--gold);" id="sp-fee-pending-count">0</div><div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800;margin-top:3px;">Pending</div></div>
+      <div style="background:var(--white);border-radius:14px;padding:12px 10px;box-shadow:var(--sh);text-align:center;border:1px solid var(--border-l);"><div style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--red);" id="sp-fee-overdue-count">0</div><div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800;margin-top:3px;">Overdue</div></div>
+    </div>
+    <div style="padding:14px 14px 6px;font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);">Fee Details</div>
+    <div id="sp-fee-list" style="padding:0 14px 14px;"></div>
+  </div>
+
+  <nav class="sp-bottom">
+    <button class="sp-nav-btn active" id="sp-nav-home" onclick="spNav('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home
+    </button>
+    <button class="sp-nav-btn" id="sp-nav-passbook" onclick="spNav('passbook')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Passbook
+    </button>
+    <button class="sp-nav-btn" id="sp-nav-challenge" onclick="spNav('challenge')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>Challenge
+    </button>
+    <button class="sp-nav-btn" id="sp-nav-fees" onclick="spNav('fees')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Fees
+    </button>
+    <button class="sp-nav-btn" onclick="studentLogout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout
+    </button>
+  </nav>
+</div>
+
+<!-- ════════════ MAIN APP ════════════ -->
+<div id="app">
+  <div class="offline-banner" id="offline-banner">📵 You are offline — changes will sync when reconnected</div>
+  <div class="backup-banner" id="backup-banner">
+    💾 Time to back up your data!
+    <button onclick="exportFullExcel();dismissBackup()">Export Now</button>
+    <button onclick="dismissBackup()" style="background:rgba(255,255,255,.1);">Later</button>
+  </div>
+  <div class="topbar" id="topbar">
+    <div class="topbar-left">
+      <button class="topbar-back" id="topbar-back" onclick="goBack()">← Back</button>
+      <div><div class="topbar-title" id="topbar-title">Student <span>Bank</span></div><div class="topbar-school" id="topbar-school"></div></div>
+    </div>
+    <div class="topbar-right">
+      <div class="conn-dot" id="conn-dot" title="Connection status"></div>
+      <button class="icon-btn" onclick="navigateTo('settings')" title="Settings">⚙</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="view active" id="view-dashboard">
+    <!-- Announcement banners (populated by JS) -->
+    <div id="ann-banner-container"></div>
+    <div class="dash-header">
+      <div class="dh-label">School Savings Bank</div>
+      <div class="dh-date" id="dh-date"></div>
+      <div class="dh-balance" id="dh-balance">₹0</div>
+      <div class="dh-balance-sub">Total Bank Balance</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card blue"><div class="stat-icon blue">👥</div><div class="stat-value" id="stat-students">0</div><div class="stat-label">Students</div></div>
+      <div class="stat-card gold"><div class="stat-icon gold">💳</div><div class="stat-value" id="stat-txns">0</div><div class="stat-label">Transactions</div></div>
+      <div class="stat-card green"><div class="stat-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></div><div class="stat-value" id="stat-deps">₹0</div><div class="stat-label">Total Deposits</div></div>
+      <div class="stat-card red"><div class="stat-icon red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></div><div class="stat-value" id="stat-wds">₹0</div><div class="stat-label">Withdrawals</div></div>
+    </div>
+    <!-- STUDENT OF THE MONTH -->
+    <div id="sotm-container"></div>
+    <!-- LOW BALANCE ALERT -->
+    <div id="low-bal-container"></div>
+    <div class="section-header"><div class="section-title">Recent Transactions</div><button class="see-all" onclick="navigateTo('daily')">See All</button></div>
+    <div class="txn-list" id="recent-txns"></div>
+    <div class="section-header"><div class="section-title">Quick Actions</div></div>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="navigateTo('add-student')"><span style="font-size:1.5rem">➕</span>Add Student</button>
+      <button class="quick-btn" onclick="navigateTo('import')"><span style="font-size:1.5rem">📥</span>Import Excel</button>
+      <button class="quick-btn" onclick="navigateTo('scanner')"><span style="font-size:1.5rem">📷</span>Scan QR</button>
+      <button class="quick-btn" onclick="navigateTo('report')"><span style="font-size:1.5rem">📊</span>Reports</button>
+      <button class="quick-btn" onclick="navigateTo('export')"><span style="font-size:1.5rem">📤</span>Export Data</button>
+      <button class="quick-btn" onclick="printAllQRCards()"><span style="font-size:1.5rem">🪪</span>Print QR Cards</button>
+      <button class="quick-btn" onclick="navigateTo('class-report')"><span style="font-size:1.5rem">📊</span>Class Report</button>
+      <button class="quick-btn" onclick="navigateTo('announcements')"><span style="font-size:1.5rem">📣</span>Announcements</button>
+      <button class="quick-btn" onclick="navigateTo('fee-management')"><span style="font-size:1.5rem">📚</span>Fee Manager</button>
+      <button class="quick-btn" onclick="bulkWhatsAppAll()"><span style="font-size:1.5rem">💬</span>Bulk WhatsApp</button>
+    </div>
+  </div>
+
+  <!-- STUDENTS -->
+  <div class="view" id="view-students">
+    <div class="search-bar">
+      <input type="search" class="search-input" id="student-search" placeholder="Search name, account, class…" oninput="debouncedSearch()">
+      <button class="filter-btn" onclick="showClassFilter()">⚗ Filter</button>
+    </div>
+    <div class="class-filter-row" id="class-filter-row"></div>
+    <div class="sort-bar">
+      <button class="sort-btn active" id="sort-name" onclick="setSort('name')">A–Z</button>
+      <button class="sort-btn" id="sort-bal-asc" onclick="setSort('bal-asc')">Balance ↑</button>
+      <button class="sort-btn" id="sort-bal-desc" onclick="setSort('bal-desc')">Balance ↓</button>
+      <button class="sort-btn" id="sort-class" onclick="setSort('class')">Class</button>
+      <button class="sort-btn" id="sort-roll" onclick="setSort('roll')">Roll No</button>
+    </div>
+    <div class="student-list" id="student-list"></div>
+    <button class="fab" onclick="navigateTo('add-student')">＋</button>
+
+<!-- FLOATING BACK BUTTON — visible on all sub-views, stays on screen while scrolling -->
+<button class="float-back" id="float-back-btn" onclick="goBack()">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  <span id="float-back-label">Back</span>
+</button>
+  </div>
+
+  <!-- ADD STUDENT -->
+  <div class="view" id="view-add-student">
+    <div class="form-section">
+      <div class="form-card">
+        <div class="form-card-title">📋 Student Information</div>
+        <div class="form-group"><label class="form-label">Student Name *</label><input type="text" class="form-input" id="new-name" placeholder="Full name"></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Account Number *</label><div style="display:flex;gap:6px;"><input type="text" class="form-input" id="new-account" placeholder="e.g. SB001" style="flex:1;" oninput="this.value=this.value.toUpperCase()"><button onclick="autoFillAccount()" style="background:var(--navy);color:#fff;border:none;border-radius:10px;padding:0 12px;font-size:.75rem;font-weight:800;cursor:pointer;white-space:nowrap;height:44px;">Auto</button></div></div>
+          <div class="form-group"><label class="form-label">Roll Number</label><input type="number" class="form-input" id="new-roll" placeholder="e.g. 25" min="1"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Class</label><input type="text" class="form-input" id="new-class" placeholder="e.g. 8A" oninput="this.value=this.value.toUpperCase()"></div>
+          <div class="form-group"><label class="form-label">Opening Balance (₹)</label><input type="number" class="form-input" id="new-balance" placeholder="0" min="0"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Parent / Guardian Phone (Optional)</label><input type="tel" class="form-input" id="new-phone" placeholder="e.g. 9876543210" maxlength="15"><div style="font-size:.68rem;color:var(--muted);margin-top:4px;">Used to pre-fill WhatsApp messages</div></div>
+
+        <!-- PIN — REQUIRED, with confirm -->
+        <div style="background:linear-gradient(135deg,#EEF3FF,#E8F0FF);border:1.5px solid #B5D4F4;border-radius:14px;padding:14px 15px;margin-bottom:14px;">
+          <div style="font-size:.72rem;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">🔐 Student Login PIN — Required</div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label">4-Digit PIN *</label><input type="password" inputmode="numeric" maxlength="4" class="form-input" id="new-student-pin" placeholder="••••" style="letter-spacing:.3em;font-size:1.1rem;text-align:center;" oninput="checkPinMatch()"></div>
+            <div class="form-group" style="margin-bottom:0;"><label class="form-label">Confirm PIN *</label><input type="password" inputmode="numeric" maxlength="4" class="form-input" id="new-student-pin-confirm" placeholder="••••" style="letter-spacing:.3em;font-size:1.1rem;text-align:center;" oninput="checkPinMatch()"></div>
+          </div>
+          <div id="pin-match-msg" style="font-size:.72rem;margin-top:7px;font-weight:700;min-height:16px;"></div>
+          <div style="font-size:.67rem;color:#5B7AB0;margin-top:5px;">Student uses this PIN to login to their portal. You can change it later from Edit Student.</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Savings Goal (₹)</label><input type="number" class="form-input" id="new-savings-goal" placeholder="e.g. 2000" min="0"><div style="font-size:.65rem;color:var(--muted);margin-top:3px;">Target balance for the year.</div></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Photo (Optional)</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <img id="new-photo-preview" src="" alt="" style="width:48px;height:48px;border-radius:14px;object-fit:cover;display:none;border:2px solid var(--border);">
+            <div id="new-photo-placeholder" style="width:48px;height:48px;border-radius:14px;background:var(--cream-d);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">👤</div>
+            <div><button onclick="document.getElementById('new-photo-input').click()" style="background:var(--cream-d);border:2px solid var(--border);border-radius:10px;padding:7px 14px;font-size:.78rem;font-weight:800;cursor:pointer;font-family:var(--font-body);color:var(--navy);">📷 Take / Upload Photo</button><div style="font-size:.68rem;color:var(--muted);margin-top:4px;">Helps identify student by face</div></div>
+          </div>
+          <input type="file" id="new-photo-input" accept="image/*" capture="environment" style="display:none" onchange="previewNewPhoto(event)">
+        </div>
+      </div>
+      <button class="btn-primary" id="create-student-btn" onclick="createStudent()">✅ Create Account &amp; Generate QR</button>
+      <div style="height:10px"></div>
+      <button class="btn-secondary" onclick="goBack()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- STUDENT DETAIL -->
+  <div class="view" id="view-student-detail">
+    <div class="sdh">
+      <div id="sdh-photo-wrap" style="margin-bottom:13px;"></div>
+      <div class="sdh-name" id="sdh-name"></div>
+      <div class="sdh-meta" id="sdh-meta"></div>
+      <div class="sdh-acc" id="sdh-acc"></div>
+      <div class="sdh-actions">
+
+        <!-- 6 utility actions — 3 per row -->
+        <button class="sdh-act" onclick="openEditStudent()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button class="sdh-act" onclick="openPassbook()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Passbook
+        </button>
+        <button class="sdh-act amber" onclick="sendWhatsAppSlip()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          WhatsApp
+        </button>
+        <button class="sdh-act" onclick="showStudentBalance()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          Balance
+        </button>
+        <button class="sdh-act" onclick="navigateTo('id-card')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          ID Card
+        </button>
+        <button class="sdh-act" id="kyc-btn" onclick="openKycModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          KYC
+        </button>
+        <button class="sdh-act full" onclick="openTransferModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;flex-shrink:0;"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          Transfer to Another Class
+        </button>
+        <button class="sdh-act full danger" onclick="openDeleteConfirm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;flex-shrink:0;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Delete Student Account
+        </button>
+
+      </div>
+    </div>
+
+    <!-- BALANCE CARD -->
+    <div class="balance-card">
+      <div class="bc-item"><div class="bc-val g" id="bc-deps">₹0</div><div class="bc-lbl">Total Credit</div></div>
+      <div class="bc-div"></div>
+      <div class="bc-item"><div class="bc-val r" id="bc-wds">₹0</div><div class="bc-lbl">Withdrawn</div></div>
+      <div class="bc-div"></div>
+      <div class="bc-item"><div class="bc-val n" id="bc-bal">₹0</div><div class="bc-lbl">Balance</div></div>
+    </div>
+
+    <!-- ══ HERO DEPOSIT / WITHDRAW ══ -->
+    <div class="txn-hero-row">
+      <button class="txn-hero deposit" onclick="openTxnModal('deposit')">
+        <div class="txn-hero-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </div>
+        <div>
+          <div class="txn-hero-label">Deposit</div>
+          <div class="txn-hero-sub">Add money</div>
+        </div>
+      </button>
+      <button class="txn-hero withdraw" onclick="openTxnModal('withdrawal')">
+        <div class="txn-hero-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        </div>
+        <div>
+          <div class="txn-hero-label">Withdraw</div>
+          <div class="txn-hero-sub">Take out money</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="qr-section">
+      <div class="qr-card">
+        <div class="qr-box" id="student-qr-box"></div>
+        <div class="qr-info"><h4>Student QR Code</h4><p>Scan to open account instantly</p><button class="qr-btn" onclick="downloadQR()">⬇ Download QR</button></div>
+      </div>
+    </div>
+    <div class="section-header" style="padding-top:6px;">
+      <div class="section-title">Transaction History</div>
+      <span id="txn-chip" class="chip" style="cursor:default"></span>
+    </div>
+    <div id="del-hint" style="display:none;font-size:.69rem;color:var(--muted);padding:0 16px 7px;text-align:right;">Tap a transaction to view receipt / delete ↓</div>
+    <div class="txn-list" id="student-txn-list"></div>
+  </div>
+
+  <!-- DAILY LOG -->
+  <div class="view" id="view-daily">
+    <div class="daily-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;">
+        <div class="daily-title" style="margin-bottom:0;">📅 Daily Transaction Log</div>
+        <button onclick="navigateTo('collection-sheet')" style="background:var(--gold);color:#fff;border:none;border-radius:10px;padding:6px 13px;font-size:.74rem;font-weight:800;cursor:pointer;font-family:var(--font-body);">📋 Collection Sheet</button>
+      </div>
+      <div class="daily-date-row">
+        <input type="date" id="daily-date" onchange="renderDailyLog()">
+        <button class="filter-btn" onclick="setTodayDate()">Today</button>
+      </div>
+    </div>
+    <div class="daily-stats">
+      <div class="ds"><div class="ds-val" id="dl-count">0</div><div class="ds-lbl">Transactions</div></div>
+      <div class="ds"><div class="ds-val" style="color:var(--green)" id="dl-deps">₹0</div><div class="ds-lbl">Deposits</div></div>
+      <div class="ds"><div class="ds-val" style="color:var(--red)" id="dl-wds">₹0</div><div class="ds-lbl">Withdrawn</div></div>
+      <div class="ds"><div class="ds-val" id="dl-net">₹0</div><div class="ds-lbl">Net</div></div>
+    </div>
+    <div class="txn-list" id="daily-txn-list"></div>
+  </div>
+
+  <!-- SCANNER -->
+  <div class="view" id="view-scanner">
+    <div style="padding:15px 14px">
+      <div style="font-family:var(--font-display);font-size:1.18rem;font-weight:700;color:var(--navy);margin-bottom:14px;">📷 QR Code Scanner</div>
+      <div class="scanner-wrap" id="scanner-wrap">
+        <video id="qr-video" autoplay playsinline muted></video>
+        <canvas id="qr-canvas" style="display:none"></canvas>
+        <div class="scan-overlay"><div class="scan-frame"><div class="sftr"></div><div class="sfbl"></div><div class="scan-line"></div></div></div>
+        <div class="scan-no-cam" id="scan-no-cam" style="display:none;"><span style="font-size:2.2rem">📷</span><span id="scan-no-cam-msg">Camera not available</span></div>
+      </div>
+      <div id="scanner-status" style="font-size:.74rem;color:var(--muted);text-align:center;padding:8px 0 0;font-weight:600;"></div>
+      <div style="background:var(--white);border-radius:var(--r-lg);padding:14px 15px;margin-top:14px;box-shadow:var(--sh-xs);border:1px solid var(--border-l);">
+        <div style="font-size:.83rem;font-weight:800;color:var(--navy);margin-bottom:7px;">📋 How to use</div>
+        <div style="font-size:.75rem;color:var(--muted);line-height:1.75;font-weight:500;">• Point camera at student's QR code<br>• Hold steady — opens automatically<br>• Or search below by name / account number</div>
+      </div>
+      <div style="height:13px"></div>
+      <div style="font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);margin-bottom:9px;">Or Search Student</div>
+      <input type="search" class="form-input" id="scanner-search" placeholder="Type name or account number…" oninput="renderScannerSearch()" style="background:#fff;">
+      <div id="scanner-results" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- IMPORT -->
+  <div class="view" id="view-import">
+    <div style="padding:15px 14px 6px;font-family:var(--font-display);font-size:1.22rem;font-weight:700;color:var(--navy);">📥 Import Student Data</div>
+    <div class="import-zone" id="import-zone" onclick="document.getElementById('import-file').click()">
+      <div style="font-size:2.6rem;margin-bottom:12px;">📄</div>
+      <h3>Tap to Import Excel / CSV</h3>
+      <p>Supports .xlsx, .xls, .csv files</p>
+      <p style="margin-top:7px;font-size:.72rem;color:var(--gold);font-weight:700;">Columns: Account Number · Student Name · Class · Roll Number · Opening Balance</p>
+    </div>
+    <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImport(event)">
+    <div id="import-preview-section"></div>
+    <div class="form-section">
+      <div class="form-card">
+        <div class="form-card-title">Expected Format</div>
+        <div class="preview-table"><table>
+          <thead><tr><th>Account Number</th><th>Student Name</th><th>Class</th><th>Roll</th><th>Balance</th></tr></thead>
+          <tbody><tr><td>SB001</td><td>Rahul Sharma</td><td>8A</td><td>12</td><td>500</td></tr><tr><td>SB002</td><td>Priya Patil</td><td>8A</td><td>13</td><td>250</td></tr></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="view" id="view-export">
+    <div style="padding:15px 14px 5px;font-family:var(--font-display);font-size:1.22rem;font-weight:700;color:var(--navy);">📤 Export Data</div>
+    <div class="export-card">
+      <div class="export-opt" onclick="exportFullExcel()"><div class="export-icon">📊</div><div class="export-info"><h4>Full Excel Report</h4><p>Students + all transactions + summary</p></div><div class="export-arrow">›</div></div>
+      <div class="export-opt" onclick="exportStudentList()"><div class="export-icon">👥</div><div class="export-info"><h4>Student List (CSV)</h4><p>All students with current balances</p></div><div class="export-arrow">›</div></div>
+      <div class="export-opt" onclick="exportTodayLog()"><div class="export-icon">📅</div><div class="export-info"><h4>Today's Transactions</h4><p>All transactions from today (CSV)</p></div><div class="export-arrow">›</div></div>
+      <div class="export-opt" onclick="exportAllTxns()"><div class="export-icon">📋</div><div class="export-info"><h4>All Transactions (CSV)</h4><p>Complete transaction history</p></div><div class="export-arrow">›</div></div>
+      <div class="export-opt" onclick="printAllQRCards()"><div class="export-icon">🪪</div><div class="export-info"><h4>Print All QR Cards</h4><p>One card per student — cut &amp; distribute</p></div><div class="export-arrow">›</div></div>
+    </div>
+  </div>
+
+  <!-- REPORT -->
+  <div class="view" id="view-report">
+    <div class="report-filter-row">
+      <select class="report-select" id="report-period" onchange="renderReport()">
+        <option value="month">This Month</option><option value="last-month">Last Month</option>
+        <option value="term1">Term 1 (Jun–Sep)</option><option value="term2">Term 2 (Oct–Jan)</option>
+        <option value="term3">Term 3 (Feb–May)</option><option value="all">All Time</option>
+      </select>
+      <select class="report-select" id="report-class" onchange="renderReport()"><option value="">All Classes</option></select>
+      <select class="report-select" id="report-category" onchange="renderReport()">
+        <option value="">All Categories</option><option value="savings">💰 Savings</option>
+        <option value="fees">📚 Fees</option><option value="fine">⚠️ Fine</option>
+        <option value="donation">🎁 Donation</option><option value="other">📦 Other</option>
+      </select>
+      <button class="filter-btn" onclick="exportReportCSV()" style="margin-left:auto;">⬇ CSV</button>
+    </div>
+    <div class="report-stat-row">
+      <div class="report-stat"><div class="report-stat-val" id="rp-students">0</div><div class="report-stat-lbl">Students</div></div>
+      <div class="report-stat"><div class="report-stat-val" style="color:var(--green)" id="rp-deposits">₹0</div><div class="report-stat-lbl">Deposits</div></div>
+      <div class="report-stat"><div class="report-stat-val" style="color:var(--red)" id="rp-withdrawals">₹0</div><div class="report-stat-lbl">Withdrawn</div></div>
+    </div>
+    <div id="report-chart-wrap" style="padding:14px 14px 0;"></div>
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <thead><tr><th>Student</th><th>Class</th><th>Deposits</th><th>Withdrawn</th><th>Balance</th></tr></thead>
+        <tbody id="report-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CLASS DASHBOARD -->
+  <div class="view" id="view-class-dashboard">
+    <div class="class-dash-header">
+      <div class="class-dash-title" id="cd-title">Class —</div>
+      <div class="class-dash-sub" id="cd-sub"></div>
+    </div>
+    <div class="class-stat-grid">
+      <div class="class-stat"><div class="class-stat-val" id="cd-students">0</div><div class="class-stat-lbl">Students</div></div>
+      <div class="class-stat"><div class="class-stat-val" id="cd-total">₹0</div><div class="class-stat-lbl">Total Saved</div></div>
+      <div class="class-stat"><div class="class-stat-val" id="cd-avg">₹0</div><div class="class-stat-lbl">Avg Balance</div></div>
+    </div>
+    <div style="padding:0 14px 6px;">
+      <div class="section-title" style="font-size:.97rem;margin-bottom:9px;">🏆 Top Savers</div>
+      <div id="cd-top-savers"></div>
+      <div class="section-title" style="font-size:.97rem;margin:13px 0 9px;">⚠️ No Deposit This Month</div>
+      <div id="cd-inactive"></div>
+      <div style="height:9px"></div>
+      <button class="btn-primary" id="cd-deposit-all-btn" onclick="openClassBulkDeposit()">⬆️ Deposit for Whole Class</button>
+    </div>
+  </div>
+
+  <!-- ARCHIVE VIEWER -->
+  <div class="view" id="view-archives">
+    <div style="padding:15px 14px 6px;font-family:var(--font-display);font-size:1.22rem;font-weight:700;color:var(--navy);">🗃️ Past Years Archive</div>
+    <div style="padding:0 14px 11px;font-size:.79rem;color:var(--muted);font-weight:500;">Each year-end rollover saves a complete snapshot here. Data is read-only.</div>
+    <div id="archive-list" style="padding:0 14px 14px;"></div>
+  </div>
+
+  <!-- ARCHIVE YEAR DETAIL -->
+  <div class="view" id="view-archive-detail">
+    <div style="padding:15px 14px 10px;">
+      <div class="section-title" id="archive-detail-title" style="margin-bottom:9px;"></div>
+      <div class="report-filter-row" style="padding:0 0 10px;">
+        <select class="report-select" id="archive-class-filter" onchange="renderArchiveDetail()"><option value="">All Classes</option></select>
+        <button class="filter-btn" onclick="exportArchiveCSV()" style="margin-left:auto;">⬇ CSV</button>
+      </div>
+      <div class="report-stat-row" style="padding:0 0 10px;">
+        <div class="report-stat"><div class="report-stat-val" id="arch-students">0</div><div class="report-stat-lbl">Students</div></div>
+        <div class="report-stat"><div class="report-stat-val" style="color:var(--green)" id="arch-deposits">₹0</div><div class="report-stat-lbl">Year Deposits</div></div>
+        <div class="report-stat"><div class="report-stat-val" style="color:var(--navy)" id="arch-final-bal">₹0</div><div class="report-stat-lbl">Final Balance</div></div>
+      </div>
+      <div class="report-table-wrap" style="padding:0;">
+        <table class="report-table">
+          <thead><tr><th>Student</th><th>Class</th><th>Year Deposits</th><th>Carried Forward</th></tr></thead>
+          <tbody id="archive-detail-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLLECTION SHEET -->
+  <div class="view" id="view-collection-sheet">
+    <div style="padding:15px 14px 6px;font-family:var(--font-display);font-size:1.22rem;font-weight:700;color:var(--navy);">📋 Daily Collection Sheet</div>
+    <div style="padding:0 14px 13px;">
+      <div style="font-size:.79rem;color:var(--muted);margin-bottom:11px;font-weight:500;">Select a class to generate a printable cash collection form, or use Quick Entry to type amounts directly.</div>
+      <div id="collection-pick-section">
+        <div style="font-size:.71rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px;">Select Class</div>
+        <div id="collection-class-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:15px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button class="btn-primary" onclick="printCollectionSheet()">🖨 Print Sheet</button>
+          <button class="btn-secondary" onclick="openQuickEntry()">⚡ Quick Entry</button>
+        </div>
+      </div>
+    </div>
+    <div id="quick-entry-section" style="display:none;padding:0 14px 14px;">
+      <div style="font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);margin-bottom:9px;">⚡ Quick Entry — <span id="qe-class-label"></span></div>
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:11px;font-weight:500;">Type amount for each student, press Enter or ↓ to advance.</div>
+      <div id="quick-entry-list"></div>
+      <div style="height:11px"></div>
+      <button class="btn-primary" onclick="submitQuickEntry()">✅ Save All Entries</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeQuickEntry()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- FEE MANAGEMENT VIEW -->
+  <div class="view" id="view-fee-management">
+    <div style="background:linear-gradient(148deg,#1A5C8A,#0F3D5C);padding:20px 18px 26px;color:#fff;position:relative;overflow:hidden;">
+      <div style="position:absolute;bottom:-1px;left:-2%;right:-2%;height:24px;background:var(--cream);border-radius:50% 50% 0 0/100% 100% 0 0;"></div>
+      <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:800;margin-bottom:3px;">📚 Fee Management</div>
+      <div style="font-size:.76rem;opacity:.6;font-weight:600;">Add dues and mark payments per student</div>
+    </div>
+    <!-- Summary -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:16px 14px 0;margin-top:-12px;position:relative;z-index:1;">
+      <div style="background:var(--white);border-radius:14px;padding:12px 10px;box-shadow:var(--sh);text-align:center;border:1px solid var(--border-l);"><div style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--green);" id="fm-total-paid">₹0</div><div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800;margin-top:3px;">Collected</div></div>
+      <div style="background:var(--white);border-radius:14px;padding:12px 10px;box-shadow:var(--sh);text-align:center;border:1px solid var(--border-l);"><div style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--gold);" id="fm-total-pending">₹0</div><div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800;margin-top:3px;">Pending</div></div>
+      <div style="background:var(--white);border-radius:14px;padding:12px 10px;box-shadow:var(--sh);text-align:center;border:1px solid var(--border-l);"><div style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--red);" id="fm-total-overdue">₹0</div><div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800;margin-top:3px;">Overdue</div></div>
+    </div>
+    <!-- Add Fee Due button -->
+    <div style="padding:14px 14px 0;display:flex;gap:9px;align-items:center;">
+      <select class="report-select" id="fm-class-filter" onchange="renderFeeManagement()" style="flex:1;"><option value="">All Classes</option></select>
+      <button onclick="openAddFeeModal()" style="background:var(--navy);color:#fff;border:none;border-radius:11px;padding:10px 16px;font-size:.82rem;font-weight:800;cursor:pointer;font-family:var(--font-body);white-space:nowrap;">＋ Add Fee Due</button>
+    </div>
+    <div style="padding:12px 14px 6px;font-family:var(--font-display);font-size:1.04rem;font-weight:700;color:var(--navy);">Fee Records</div>
+    <div id="fm-list" style="padding:0 14px 14px;"></div>
+  </div>
+
+  <!-- ADD FEE MODAL -->
+  <div class="modal-overlay" id="add-fee-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">📚 Add Fee Due</div>
+      <div class="form-group"><label class="form-label">Fee Title *</label><input type="text" class="form-input" id="fee-title-input" placeholder="e.g. Term 1 Fees, Picnic Fee" maxlength="80"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Amount (₹) *</label><input type="number" class="form-input" id="fee-amount-input" placeholder="e.g. 500" min="1"></div>
+        <div class="form-group"><label class="form-label">Due Date</label><input type="date" class="form-input" id="fee-due-date-input"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Apply To</label>
+        <select class="form-select" id="fee-target-select">
+          <option value="all">All Students</option>
+          <option value="class">Specific Class</option>
+          <option value="student">Specific Student</option>
+        </select>
+      </div>
+      <div class="form-group" id="fee-class-group" style="display:none;"><label class="form-label">Class</label><input type="text" class="form-input" id="fee-class-input" placeholder="e.g. 8A" style="text-transform:uppercase;"></div>
+      <div class="form-group" id="fee-student-group" style="display:none;"><label class="form-label">Account Number</label><input type="text" class="form-input" id="fee-student-input" placeholder="e.g. SB001" style="text-transform:uppercase;"></div>
+      <div style="height:5px"></div>
+      <button class="btn-primary" onclick="saveFeeDue()">✅ Create Fee Due</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('add-fee-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- MARK FEE PAID MODAL -->
+  <div class="modal-overlay" id="mark-fee-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">✅ Mark Fee as Paid</div>
+      <div id="mark-fee-preview" style="background:var(--cream);border-radius:var(--r-lg);padding:12px 15px;margin-bottom:14px;font-size:.84rem;"></div>
+      <div class="form-group"><label class="form-label">Payment Date</label><input type="date" class="form-input" id="mark-fee-date"></div>
+      <div class="form-group"><label class="form-label">Note (Optional)</label><input type="text" class="form-input" id="mark-fee-note" placeholder="e.g. Paid in cash" maxlength="80"></div>
+      <button class="btn-primary" onclick="confirmMarkFeePaid()">✅ Mark as Paid</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('mark-fee-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- TEACHERS -->
+  <div class="view" id="view-teachers">
+    <div style="padding:15px 14px 6px;font-family:var(--font-display);font-size:1.22rem;font-weight:700;color:var(--navy);">👩‍🏫 Teachers</div>
+    <div class="teachers-section">
+      <div class="invite-box">
+        <h4>📋 School Join Details</h4>
+        <p>Share these two codes with teachers so they can join instantly — no approval needed.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;margin:11px 0 14px;">
+          <div style="background:rgba(255,255,255,.09);border-radius:12px;padding:11px 13px;border:1px solid rgba(255,255,255,.16);">
+            <div style="font-size:.62rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px;font-weight:800;">School Code</div>
+            <div id="display-school-code" style="font-family:var(--font-display);font-size:1.55rem;font-weight:700;color:var(--gold-l);letter-spacing:.13em;"></div>
+          </div>
+          <div style="background:rgba(255,255,255,.09);border-radius:12px;padding:11px 13px;border:1px solid rgba(255,255,255,.16);">
+            <div style="font-size:.62rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px;font-weight:800;">Invite Code</div>
+            <div id="display-invite-code" style="font-family:var(--font-display);font-size:1.55rem;font-weight:700;color:var(--gold-l);letter-spacing:.13em;">······</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-copy" onclick="copyJoinDetails()">📋 Copy Both Codes</button>
+          <button class="btn-copy" onclick="shareJoinDetails()" style="background:var(--green);">📲 Share via WhatsApp</button>
+          <button class="btn-copy" id="regen-btn" onclick="regenInviteCode()" style="background:rgba(255,255,255,.16);display:none;">🔄 New Invite Code</button>
+        </div>
+      </div>
+      <div class="section-header" style="padding:11px 0 9px 0;">
+        <div class="section-title" style="font-size:1.02rem;">✅ Active Teachers</div>
+        <div style="display:flex;gap:7px;align-items:center;">
+          <span id="teacher-count-chip" class="chip" style="cursor:default;"></span>
+          <button id="clean-dupes-btn" onclick="cleanDuplicateTeachers()" style="display:none;background:var(--red-l);color:var(--red);border:1px solid var(--red-m);border-radius:9px;padding:4px 11px;font-size:.68rem;font-weight:800;cursor:pointer;font-family:var(--font-body);">🧹 Fix Duplicates</button>
+        </div>
+      </div>
+      <div id="active-teachers-list"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="view" id="view-settings">
+    <div style="padding:15px 14px 5px;font-family:var(--font-display);font-size:1.22rem;font-weight:700;color:var(--navy);">⚙️ Settings</div>
+    <div style="padding:0 14px 9px;font-size:.73rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;">My Account</div>
+    <div class="export-card">
+      <div class="settings-row">
+        <div class="settings-icon">👤</div>
+        <div class="settings-info"><h4 id="settings-teacher-name">Teacher Name</h4><p id="settings-teacher-info">School · Role</p></div>
+      </div>
+      <div class="settings-row" onclick="logoutTeacher()">
+        <div class="settings-icon">🚪</div>
+        <div class="settings-info"><h4>Logout</h4><p>Sign out of your account</p></div>
+        <div class="export-arrow">›</div>
+      </div>
+    </div>
+    <div style="padding:4px 14px 9px;font-size:.73rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;">School Info</div>
+    <div class="export-card">
+      <div class="settings-row">
+        <div class="settings-icon">🏫</div>
+        <div class="settings-info"><h4 id="settings-school-name">School Name</h4><p id="settings-school-code">School Code: —</p></div>
+      </div>
+      <div class="settings-row" id="edit-school-row" style="display:none;" onclick="openEditSchoolName()">
+        <div class="settings-icon">✏️</div>
+        <div class="settings-info"><h4>Edit School Name</h4><p>Change the displayed school name</p></div>
+        <div class="export-arrow">›</div>
+      </div>
+    </div>
+    <div style="padding:4px 14px 9px;font-size:.73rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;">Data</div>
+    <div class="export-card">
+      <div class="settings-row" onclick="navigateTo('archives')">
+        <div class="settings-icon">🗃️</div>
+        <div class="settings-info"><h4>Past Years Archive</h4><p>Browse previous academic year records</p></div>
+        <div class="export-arrow">›</div>
+      </div>
+    </div>
+    <div style="padding:4px 14px 9px;font-size:.73rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;">App Security</div>
+    <div class="export-card">
+      <div class="settings-row" onclick="openPinSetup()">
+        <div class="settings-icon">🔒</div>
+        <div class="settings-info"><h4 id="pin-settings-label">Set PIN Lock</h4><p id="pin-settings-sub">Secure your account — works on all devices</p></div>
+        <div class="export-arrow">›</div>
+      </div>
+      <div class="settings-row" id="remove-pin-row" style="display:none;" onclick="confirmRemovePin()">
+        <div class="settings-icon">🔓</div>
+        <div class="settings-info"><h4>Remove PIN</h4><p>Disable PIN lock for your account</p></div>
+        <div class="export-arrow">›</div>
+      </div>
+    </div>
+    <div style="padding:4px 14px 9px;font-size:.73rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;">Quick Deposit Presets</div>
+    <div class="export-card">
+      <div class="settings-row" onclick="openPresetSettings()">
+        <div class="settings-icon">💸</div>
+        <div class="settings-info"><h4>Deposit Amount Presets</h4><p id="preset-settings-sub">₹10 · ₹20 · ₹50 · ₹100</p></div>
+        <div class="export-arrow">›</div>
+      </div>
+    </div>
+    <div style="padding:4px 14px 9px;font-size:.73rem;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;" id="danger-label">Danger Zone</div>
+    <div class="form-section" style="padding-top:0;" id="danger-zone">
+      <div class="form-card" style="border:2px solid #FDE68A;margin-bottom:12px;">
+        <div class="form-card-title" style="color:#92400E;">📅 Year-End Rollover</div>
+        <p style="font-size:.79rem;color:var(--muted);margin-bottom:13px;line-height:1.6;font-weight:500;">Close the current academic year. Each student's current balance becomes their new opening balance, and all transaction history is archived. <strong>Export your data first!</strong></p>
+        <button onclick="openRolloverModal()" style="width:100%;background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;border:none;border-radius:11px;padding:12px;font-size:.9rem;font-weight:800;cursor:pointer;font-family:var(--font-body);">📅 Start Year-End Rollover</button>
+      </div>
+      <div class="form-card" style="border:2px solid var(--red-m);">
+        <div class="form-card-title" style="color:var(--red);">⚠️ Reset All Data</div>
+        <p style="font-size:.79rem;color:var(--muted);margin-bottom:13px;line-height:1.55;font-weight:500;">Permanently deletes ALL students and transactions from this school. Export first!</p>
+        <button class="btn-danger" onclick="openResetConfirm()" style="width:100%">🗑 Reset All School Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ VIEW: DIGITAL ID CARD ══════════ -->
+  <div class="view" id="view-id-card">
+    <!-- Header bar -->
+    <div style="background:linear-gradient(150deg,var(--navy),var(--navy-ll));padding:18px 16px 22px;color:#fff;">
+      <div style="font-family:var(--font-display);font-size:1.4rem;font-weight:700;margin-bottom:3px;">Student ID Card</div>
+      <div style="font-size:.74rem;opacity:.55;">Official identity card for school savings bank</div>
+    </div>
+
+    <!-- Card preview -->
+    <div class="id-card-view">
+      <div class="id-card-preview-wrap">
+        <!-- Canvas sized 540×860 but displayed responsively via CSS -->
+        <canvas id="id-card-canvas" width="540" height="860"></canvas>
+        <div class="id-card-actions">
+          <button class="btn-primary" onclick="downloadIDCard()">⬇ Download</button>
+          <button class="btn-secondary" onclick="shareIDCard()">📲 Share</button>
+        </div>
+      </div>
+
+      <!-- Tips -->
+      <div style="background:var(--white);border-radius:var(--r);padding:14px 15px;box-shadow:var(--sh-xs);border:1px solid var(--border-l);">
+        <div style="font-weight:800;font-size:.82rem;color:var(--navy);margin-bottom:8px;">💡 How to use</div>
+        <div style="font-size:.76rem;color:var(--muted);line-height:1.7;">
+          • <strong>Download</strong> and print — laminate for a physical ID card<br>
+          • <strong>Share via WhatsApp</strong> — parent saves it on their phone<br>
+          • QR code on card opens the student account when scanned<br>
+          • Go to <strong>KYC</strong> on the student page to add a verified photo
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ VIEW: COMPARATIVE CLASS REPORT ══════════ -->
+  <div class="view" id="view-class-report">
+    <div class="class-report-header">
+      <div class="class-report-title">📊 Class Comparison</div>
+      <div class="class-report-sub" id="cr-sub">All classes · Current year</div>
+    </div>
+    <div class="class-report-summary">
+      <div class="cr-stat"><div class="cr-stat-val" id="cr-total-classes">0</div><div class="cr-stat-lbl">Classes</div></div>
+      <div class="cr-stat"><div class="cr-stat-val" id="cr-total-students">0</div><div class="cr-stat-lbl">Students</div></div>
+      <div class="cr-stat"><div class="cr-stat-val" id="cr-total-saved">₹0</div><div class="cr-stat-lbl">Total Saved</div></div>
+    </div>
+    <div style="padding:0 14px 6px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--navy);">Class Rankings</div>
+      <div style="display:flex;gap:7px;">
+        <button onclick="exportClassReportCSV()" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:.73rem;font-weight:800;cursor:pointer;font-family:var(--font-body);">⬇ CSV</button>
+        <button onclick="printClassReport()" style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:.73rem;font-weight:800;cursor:pointer;font-family:var(--font-body);">🖨 Print</button>
+      </div>
+    </div>
+    <div id="class-rank-list" style="padding:0 14px 14px;"></div>
+  </div>
+
+  <!-- ══════════ VIEW: ANNOUNCEMENTS ══════════ -->
+  <div class="view" id="view-announcements">
+    <div style="background:linear-gradient(150deg,var(--navy),var(--navy-ll));padding:18px;color:#fff;">
+      <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:700;">📣 Announcements</div>
+      <div style="font-size:.74rem;opacity:.55;margin-top:3px;">Visible to all teachers on their dashboard</div>
+    </div>
+    <!-- Compose box (manager only) -->
+    <div id="ann-compose-section" style="display:none;padding:14px 14px 0;">
+      <div class="ann-compose-box">
+        <div style="font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:11px;">➕ New Announcement</div>
+        <div class="ann-type-row">
+          <button class="ann-type-btn active info" data-type="info" onclick="selectAnnType('info',this)">ℹ️ Info</button>
+          <button class="ann-type-btn warning" data-type="warning" onclick="selectAnnType('warning',this)">⚠️ Warning</button>
+          <button class="ann-type-btn urgent" data-type="urgent" onclick="selectAnnType('urgent',this)">🚨 Urgent</button>
+        </div>
+        <div class="form-group"><label class="form-label">Title *</label><input type="text" class="form-input" id="ann-title-input" placeholder="e.g. Picnic collection starts Monday" maxlength="80"></div>
+        <div class="form-group"><label class="form-label">Message</label><textarea class="form-input" id="ann-body-input" placeholder="Details for teachers…" rows="3" maxlength="300" style="resize:none;"></textarea></div>
+        <button class="btn-primary" onclick="postAnnouncement()" id="ann-post-btn">📣 Post Announcement</button>
+      </div>
+    </div>
+    <div style="padding:12px 14px 6px;font-family:var(--font-display);font-size:.95rem;font-weight:700;color:var(--navy);">Active Announcements</div>
+    <div id="ann-list-container" style="padding:0 14px 14px;"></div>
+  </div>
+
+  <!-- ══════════ VIEW: KYC VERIFY ══════════ (handled via modal) -->
+
+  <!-- ── ALL MODALS ── -->
+
+  <!-- KYC VERIFICATION MODAL -->
+  <div class="modal-overlay" id="kyc-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">📸 KYC Verification</div>
+      <div id="kyc-modal-content">
+        <div class="kyc-photo-row">
+          <div class="kyc-photo-circle" id="kyc-photo-circle"><span style="font-size:1.5rem">👤</span></div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:.9rem;color:var(--navy);" id="kyc-student-name-lbl">Student Name</div>
+            <div style="font-size:.73rem;color:var(--muted);margin-top:2px;" id="kyc-student-acc-lbl">Account</div>
+            <div id="kyc-current-status" style="margin-top:6px;"></div>
+          </div>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:12px;line-height:1.6;">Take a clear photo of the student's face for identity verification. This photo will be attached to their account and shown on the ID card.</div>
+        <div style="display:flex;gap:9px;margin-bottom:12px;">
+          <button onclick="document.getElementById('kyc-photo-input').click()" style="flex:1;background:var(--cream-d);border:1.5px solid var(--border);border-radius:10px;padding:10px;font-size:.8rem;font-weight:800;cursor:pointer;font-family:var(--font-body);color:var(--navy);">📷 Take Photo</button>
+          <button onclick="document.getElementById('kyc-gallery-input').click()" style="flex:1;background:var(--cream-d);border:1.5px solid var(--border);border-radius:10px;padding:10px;font-size:.8rem;font-weight:800;cursor:pointer;font-family:var(--font-body);color:var(--navy);">🖼 Gallery</button>
+        </div>
+        <input type="file" id="kyc-photo-input" accept="image/*" capture="user" style="display:none" onchange="handleKycPhoto(event)">
+        <input type="file" id="kyc-gallery-input" accept="image/*" style="display:none" onchange="handleKycPhoto(event)">
+        <div id="kyc-photo-preview-wrap" style="display:none;margin-bottom:12px;text-align:center;">
+          <img id="kyc-photo-preview-img" style="width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid var(--green-m);" src="" alt="">
+          <div style="font-size:.73rem;color:var(--green);margin-top:6px;font-weight:700;">✓ Photo ready</div>
+        </div>
+        <button class="btn-primary" id="kyc-verify-btn" onclick="confirmKycVerify()">✅ Mark as Verified</button>
+        <div style="height:8px"></div>
+        <button class="btn-secondary" onclick="closeModal('kyc-modal')">Cancel</button>
+        <div style="height:8px"></div>
+        <button id="kyc-unverify-btn" onclick="confirmKycUnverify()" style="display:none;width:100%;background:var(--red-l);color:var(--red);border:1.5px solid var(--red-m);border-radius:11px;padding:11px;font-size:.85rem;font-weight:800;cursor:pointer;font-family:var(--font-body);">🗑 Remove KYC Verification</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE ANNOUNCEMENT CONFIRM MODAL -->
+  <div class="modal-overlay" id="del-ann-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" style="color:var(--red);">🗑 Delete Announcement?</div>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:18px;line-height:1.6;">This will remove the announcement from all teachers' dashboards immediately.</p>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="closeModal('del-ann-modal')">Cancel</button>
+        <button class="btn-danger" onclick="confirmDeleteAnn()" style="border-radius:11px;padding:13px;font-size:.88rem;font-weight:800;font-family:var(--font-body);">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRANSACTION RECEIPT MODAL -->
+  <div class="modal-overlay" id="receipt-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal" style="padding:0 0 20px;">
+      <div style="padding:15px 16px 0;"><div class="modal-handle"></div></div>
+      <div class="receipt-slip" id="receipt-content" style="margin:0 16px;"></div>
+      <div style="padding:15px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button class="btn-primary" onclick="printTxnReceipt()">🖨 Print</button>
+        <button class="btn-secondary" onclick="closeModal('receipt-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASSBOOK MODAL -->
+  <div class="modal-overlay" id="passbook-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal" style="padding:0 0 26px;">
+      <div style="padding:15px 16px 0;"><div class="modal-handle"></div></div>
+      <div class="passbook-wrap" id="passbook-content"></div>
+      <div style="padding:15px 16px 0;display:flex;gap:10px;">
+        <button class="btn-primary" style="flex:1" onclick="printPassbook()">🖨 Print Passbook</button>
+        <button class="btn-secondary" style="flex:1" onclick="closeModal('passbook-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT SCHOOL NAME MODAL -->
+  <div class="modal-overlay" id="edit-school-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">🏫 Edit School Name</div>
+      <div class="form-group"><label class="form-label">School Name *</label><input type="text" class="form-input" id="edit-school-name-input" placeholder="Full school name"></div>
+      <div style="height:5px"></div>
+      <button class="btn-primary" onclick="saveSchoolName()">💾 Save</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('edit-school-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- TRANSACTION MODAL -->
+  <div class="modal-overlay" id="txn-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="modal-title">New Transaction</div>
+      <div class="txn-type-toggle">
+        <button class="type-btn deposit" id="type-btn-dep" onclick="setTxnType('deposit')">⬆️ Deposit</button>
+        <button class="type-btn withdraw" id="type-btn-wd" onclick="setTxnType('withdrawal')">⬇️ Withdraw</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <div class="cat-selector" id="cat-selector">
+          <button class="cat-btn active savings" data-cat="savings" onclick="selectCat('savings')">💰 Savings</button>
+          <button class="cat-btn fees" data-cat="fees" onclick="selectCat('fees')">📚 Fees</button>
+          <button class="cat-btn fine" data-cat="fine" onclick="selectCat('fine')">⚠️ Fine</button>
+          <button class="cat-btn donation" data-cat="donation" onclick="selectCat('donation')">🎁 Donation</button>
+          <button class="cat-btn other" data-cat="other" onclick="selectCat('other')">📦 Other</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount (₹) *</label>
+        <div class="preset-row" id="preset-row"></div>
+        <input type="number" class="form-input" id="txn-amount" placeholder="Enter amount" min="1" step="1" style="font-size:1.1rem;font-weight:700;" oninput="clearActivePreset()">
+      </div>
+      <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="txn-date"></div>
+      <div class="form-group"><label class="form-label">Note (Optional)</label><input type="text" class="form-input" id="txn-note" placeholder="e.g. Weekly savings" maxlength="100"></div>
+      <div style="height:6px"></div>
+      <button class="btn-primary" id="save-txn-btn" onclick="saveTransaction()">✅ Record Transaction</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('txn-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- EDIT STUDENT MODAL -->
+  <div class="modal-overlay" id="edit-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">✏️ Edit Student</div>
+      <div class="form-group"><label class="form-label">Student Name *</label><input type="text" class="form-input" id="edit-name"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Account (read-only)</label><input type="text" class="form-input" id="edit-account" readonly style="opacity:.5;"></div>
+        <div class="form-group"><label class="form-label">Roll Number</label><input type="number" class="form-input" id="edit-roll" min="1"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Class</label><input type="text" class="form-input" id="edit-class"></div>
+        <div class="form-group"><label class="form-label">Opening Balance</label><input type="number" class="form-input" id="edit-balance" min="0"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Parent / Guardian Phone</label><input type="tel" class="form-input" id="edit-phone" placeholder="e.g. 9876543210" maxlength="15"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Reset Student PIN</label><input type="password" inputmode="numeric" maxlength="4" class="form-input" id="edit-student-pin" placeholder="New PIN (blank = no change)" style="letter-spacing:.2em;text-align:center;"></div>
+        <div class="form-group"><label class="form-label">Savings Goal (₹)</label><input type="number" class="form-input" id="edit-savings-goal" placeholder="e.g. 2000" min="0"></div>
+      </div>
+      <div style="height:5px"></div>
+      <button class="btn-primary" onclick="saveEditStudent()">💾 Save Changes</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('edit-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRM MODAL -->
+  <div class="modal-overlay" id="delete-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" style="color:var(--red);">🗑 Delete Student?</div>
+      <p style="font-size:.84rem;color:var(--muted);margin-bottom:18px;line-height:1.65;font-weight:500;">This permanently deletes the student and all their transactions. This cannot be undone.</p>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="closeModal('delete-modal')">Cancel</button>
+        <button class="btn-danger" onclick="confirmDelete()" style="border-radius:14px;padding:14px;font-size:.9rem;font-weight:800;font-family:var(--font-body);">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROLLOVER MODAL -->
+  <div class="modal-overlay" id="rollover-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" style="color:#92400E;">📅 Year-End Rollover</div>
+      <div class="rollover-warning">⚠️ <strong>This action cannot be undone.</strong> All transaction history will be cleared. Each student's current balance becomes the new opening balance.<br><br>Please <strong>export your data first</strong> before proceeding.</div>
+      <div class="rollover-summary" id="rollover-summary-box"></div>
+      <div class="form-group"><label class="form-label">Type "ROLLOVER" to confirm</label><input type="text" class="form-input" id="rollover-confirm-input" placeholder="ROLLOVER" autocomplete="off"></div>
+      <div style="height:5px"></div>
+      <button onclick="performRollover()" style="width:100%;background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;border:none;border-radius:14px;padding:14px;font-size:.97rem;font-weight:800;font-family:var(--font-body);cursor:pointer;" id="rollover-confirm-btn">📅 Confirm Rollover</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('rollover-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- RESET CONFIRM MODAL -->
+  <div class="modal-overlay" id="reset-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" style="color:var(--red);">⚠️ Reset All Data?</div>
+      <p style="font-size:.84rem;color:var(--muted);margin-bottom:18px;line-height:1.65;font-weight:500;">This will permanently delete ALL students and transactions for your school. Export your data first!</p>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="closeModal('reset-modal')">Cancel</button>
+        <button class="btn-danger" onclick="performReset()" style="border-radius:14px;padding:14px;font-size:.9rem;font-weight:800;font-family:var(--font-body);">Reset All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRANSFER MODAL -->
+  <div class="modal-overlay" id="transfer-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">🔄 Transfer to New Class</div>
+      <p style="font-size:.84rem;color:var(--muted);margin-bottom:15px;line-height:1.65;font-weight:500;">Move this student to a different class. All transactions and history are kept.</p>
+      <div class="form-group"><label class="form-label">New Class *</label><input type="text" class="form-input" id="transfer-class" placeholder="e.g. 9A" style="text-transform:uppercase;"></div>
+      <div style="height:5px"></div>
+      <button class="btn-primary" onclick="confirmTransfer()">✅ Transfer Student</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('transfer-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- DELETE TRANSACTION MODAL -->
+  <div class="modal-overlay" id="del-txn-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" style="color:var(--red);">🗑 Delete Transaction?</div>
+      <div id="del-txn-preview" style="background:var(--cream);border-radius:var(--r-lg);padding:12px 15px;margin-bottom:15px;font-size:.84rem;font-weight:500;"></div>
+      <div class="form-group"><label class="form-label">Reason for deletion *</label><input type="text" class="form-input" id="del-txn-reason" placeholder="e.g. Wrong amount entered" maxlength="200"></div>
+      <div class="btn-row" style="margin-top:9px;">
+        <button class="btn-secondary" onclick="closeModal('del-txn-modal')">Cancel</button>
+        <button class="btn-danger" onclick="confirmDeleteTxn()" style="border-radius:14px;padding:14px;font-size:.9rem;font-weight:800;font-family:var(--font-body);">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN SETUP MODAL -->
+  <!-- pin-setup-modal removed — PIN setup uses the numpad screen directly -->
+
+  <!-- PRESET SETTINGS MODAL -->
+  <div class="modal-overlay" id="preset-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title">💸 Quick Deposit Presets</div>
+      <p style="font-size:.84rem;color:var(--muted);margin-bottom:15px;font-weight:500;">Enter up to 5 amounts (comma-separated) that appear as quick-tap buttons on the deposit screen.</p>
+      <div class="form-group"><label class="form-label">Amounts (₹)</label><input type="text" class="form-input" id="preset-input" placeholder="e.g. 10,20,50,100"></div>
+      <div style="height:5px"></div>
+      <button class="btn-primary" onclick="savePresets()">💾 Save Presets</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('preset-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- TRANSFER MANAGER MODAL -->
+  <div class="modal-overlay" id="transfer-mgr-modal" onclick="if(event.target===this)closeModal(this.id)">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-title" style="color:#92400E;">👑 Transfer Manager Role</div>
+      <!-- Warning box -->
+      <div style="background:#FFF8E6;border:1.5px solid #FCD34D;border-radius:14px;padding:14px 15px;margin-bottom:16px;">
+        <div style="font-weight:800;font-size:.86rem;color:#92400E;margin-bottom:7px;">⚠️ This is a permanent transfer</div>
+        <div style="font-size:.79rem;color:#78350F;line-height:1.65;">
+          • <strong id="transfer-mgr-target-name">—</strong> will become the new Manager<br>
+          • They get full admin powers immediately<br>
+          • <strong>You will become a regular Teacher</strong><br>
+          • You will lose access to: delete transactions, rollover, reset data, remove teachers<br>
+          • This cannot be undone by you — only the new manager can transfer it back
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Type "TRANSFER" to confirm</label>
+        <input type="text" class="form-input" id="transfer-mgr-confirm-input" placeholder="TRANSFER" autocomplete="off" style="text-transform:uppercase;letter-spacing:.08em;font-weight:700;">
+      </div>
+      <div style="height:5px"></div>
+      <button id="transfer-mgr-confirm-btn" onclick="confirmTransferManager()" style="width:100%;background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;border:none;border-radius:14px;padding:14px;font-size:.94rem;font-weight:800;font-family:var(--font-body);cursor:pointer;">👑 Yes, Transfer Manager Role</button>
+      <div style="height:9px"></div>
+      <button class="btn-secondary" onclick="closeModal('transfer-mgr-modal')">Cancel — Keep My Role</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-view="dashboard" onclick="navigateTo('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item" data-view="students" onclick="navigateTo('students')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Students</span>
+    </button>
+    <button class="nav-item" data-view="scanner" onclick="navigateTo('scanner')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+      <span>Scanner</span>
+    </button>
+    <button class="nav-item" data-view="daily" onclick="navigateTo('daily')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Daily Log</span>
+    </button>
+    <button class="nav-item" data-view="teachers" id="nav-5th" onclick="navigateTo('teachers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="23" y1="11" x2="17" y2="11"/><line x1="20" y1="8" x2="20" y2="14"/></svg>
+      <span id="nav-5th-label">Teachers</span>
+    </button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+  <script src="js/state/store.js"></script>
+  <script src="js/config/firebase.js"></script>
+  <script src="js/services/auth.service.js"></script>
+  <script src="js/services/student.service.js"></script>
+  <script src="js/services/transaction.service.js"></script>
+  <script src="js/ui/toast.js"></script>
+  <script src="js/ui/navigation.js"></script>
+  <script src="js/ui/pin.js"></script>
+  <script src="js/ui/render/views.js"></script>
+  <script src="js/ui/render/idcard.js"></script>
+  <script src="js/ui/portal.controller.js"></script>
+  <script src="js/ui/init.js"></script>
+</body>
+</html>

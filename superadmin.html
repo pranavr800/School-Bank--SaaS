@@ -1,0 +1,2196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>Dev Console — Student Bank</title>
+<meta name="robots" content="noindex, nofollow">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --bg:#111827; --bg2:#1F2937; --bg3:#283548; --bg4:#374151;
+  --border:#374151; --border2:#4B5563;
+  --text:#F9FAFB; --text2:#D1D5DB; --text3:#9CA3AF; --text4:#6B7280;
+  --accent:#3B82F6; --accent-l:#60A5FA; --accent-bg:rgba(59,130,246,.12);
+  --green:#22C55E; --green-bg:rgba(34,197,94,.12);
+  --red:#F87171; --red-bg:rgba(248,113,113,.12);
+  --amber:#FBBF24; --amber-bg:rgba(251,191,36,.12);
+  --purple:#C084FC; --purple-bg:rgba(192,132,252,.12);
+  --mono:'JetBrains Mono',monospace; --sans:'Inter',system-ui,sans-serif;
+  --r:6px; --r-lg:10px; --r-xl:16px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* AUTH */
+#auth-wall{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:var(--bg);opacity:1;pointer-events:all;transition:opacity .35s ease}
+#auth-wall.fade-out{opacity:0;pointer-events:none}
+.auth-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-xl);padding:40px 36px;width:min(440px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.auth-logo{display:flex;align-items:center;gap:10px;font-size:1rem;font-weight:700;color:var(--text);margin-bottom:4px}
+.auth-logo .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px rgba(59,130,246,.6);flex-shrink:0}
+.auth-badge{display:inline-block;background:var(--accent-bg);border:1px solid rgba(59,130,246,.25);border-radius:100px;padding:3px 12px;font-family:var(--mono);font-size:11px;color:var(--accent-l);letter-spacing:.05em;margin-bottom:28px}
+.auth-title{font-size:1.6rem;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:-.02em}
+.auth-sub{font-size:.88rem;color:var(--text3);line-height:1.65;margin-bottom:28px}
+.auth-label{display:block;font-size:.75rem;font-weight:600;color:var(--text3);margin-bottom:6px}
+.auth-input{width:100%;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r);padding:11px 14px;font-size:.92rem;font-family:var(--sans);color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;margin-bottom:14px}
+.auth-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+.auth-input::placeholder{color:var(--text4)}
+.auth-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:12px;font-size:.95rem;font-weight:600;font-family:var(--sans);cursor:pointer;transition:background .2s,transform .1s;box-shadow:0 4px 14px rgba(59,130,246,.3)}
+.auth-btn:hover{background:var(--accent-l)}
+.auth-btn:active{transform:scale(.98)}
+.auth-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.auth-err{font-size:.82rem;color:var(--red);min-height:20px;margin-top:10px;text-align:center;font-family:var(--mono)}
+.auth-info{display:flex;align-items:flex-start;gap:10px;margin-top:20px;padding:13px 14px;background:var(--accent-bg);border:1px solid rgba(59,130,246,.2);border-radius:var(--r);font-size:.83rem;color:var(--text2);line-height:1.6}
+.auth-info code{font-family:var(--mono);font-size:.78rem;background:var(--bg3);border-radius:4px;padding:1px 5px;color:var(--accent-l)}
+
+/* APP SHELL */
+#app{display:flex;height:100vh;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .4s ease}
+#app.visible{opacity:1;pointer-events:all}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 22px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-left{display:flex;align-items:center;gap:14px}
+.topbar-logo{display:flex;align-items:center;gap:9px;font-size:1rem;font-weight:700;color:var(--text)}
+.topbar-logo .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px rgba(59,130,246,.6)}
+.topbar-badge{font-family:var(--mono);font-size:11px;font-weight:600;background:var(--accent-bg);color:var(--accent-l);border:1px solid rgba(59,130,246,.22);border-radius:100px;padding:3px 10px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.topbar-user{font-size:.82rem;color:var(--text3);font-family:var(--mono)}
+.conn-pill{display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;color:var(--green)}
+.conn-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.btn-sm{background:var(--bg3);border:1.5px solid var(--border2);color:var(--text2);border-radius:var(--r);padding:7px 14px;font-size:.82rem;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-sm:hover{color:var(--text);background:var(--bg4);border-color:var(--text4)}
+.btn-sm.danger:hover{color:var(--red);border-color:rgba(248,113,113,.35);background:var(--red-bg)}
+
+/* LAYOUT */
+.body-wrap{display:flex;flex:1;overflow:hidden}
+.sidebar{width:230px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding:10px 0}
+.sidebar-section{padding:18px 18px 6px;font-size:11px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.08em}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;margin:1px 8px;border-radius:var(--r);font-size:.88rem;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;border:1px solid transparent;user-select:none}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--accent-bg);color:var(--accent-l);border-color:rgba(59,130,246,.18)}
+.nav-icon{font-size:15px;flex-shrink:0}
+.nav-badge{margin-left:auto;font-family:var(--mono);font-size:11px;background:var(--bg4);color:var(--text3);border-radius:100px;padding:2px 8px;font-weight:600}
+.nav-item.active .nav-badge{background:rgba(59,130,246,.18);color:var(--accent-l)}
+.nav-item.ai-nav{background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(59,130,246,.1));border-color:rgba(139,92,246,.25);color:#a78bfa}
+.nav-item.ai-nav:hover,.nav-item.ai-nav.active{background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(59,130,246,.15));color:#c4b5fd;border-color:rgba(139,92,246,.4)}
+.sidebar-footer{margin-top:auto;padding:14px 18px;border-top:1px solid var(--border);font-size:12px;color:var(--text4);font-family:var(--mono);line-height:1.8}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;padding:28px;display:flex;flex-direction:column;gap:22px;background:var(--bg)}
+.view{display:none;flex-direction:column;gap:20px}
+.view.active{display:flex}
+.page-title{font-size:1.35rem;font-weight:700;color:var(--text);letter-spacing:-.01em}
+.page-sub{font-size:.88rem;color:var(--text3);margin-top:4px}
+
+/* STAT CARDS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.stat-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:20px 22px;transition:border-color .2s,box-shadow .2s}
+.stat-card:hover{border-color:var(--border2);box-shadow:0 4px 18px rgba(0,0,0,.25)}
+.stat-label{font-size:12px;font-weight:600;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.stat-val{font-size:2rem;font-weight:700;color:var(--text);line-height:1;letter-spacing:-.03em}
+.stat-sub{font-size:12px;color:var(--text4);margin-top:6px;font-family:var(--mono)}
+.stat-card.c-blue{border-color:rgba(59,130,246,.3);background:rgba(59,130,246,.06)}.stat-card.c-blue .stat-val{color:var(--accent-l)}
+.stat-card.c-green{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.05)}.stat-card.c-green .stat-val{color:var(--green)}
+.stat-card.c-amber{border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.05)}.stat-card.c-amber .stat-val{color:var(--amber)}
+.stat-card.c-purple{border-color:rgba(192,132,252,.3);background:rgba(192,132,252,.05)}.stat-card.c-purple .stat-val{color:var(--purple)}
+.stat-card.c-red{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.06)}.stat-card.c-red .stat-val{color:var(--red)}
+
+/* TABLES */
+.table-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.table-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.table-title{font-size:1rem;font-weight:600;color:var(--text)}
+.table-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.search-input{background:var(--bg3);border:1.5px solid var(--border2);color:var(--text);border-radius:var(--r);padding:8px 12px;font-size:.85rem;font-family:var(--sans);outline:none;width:220px;transition:border-color .2s}
+.search-input:focus{border-color:var(--accent)}
+.search-input::placeholder{color:var(--text4)}
+.table-wrap{overflow-x:auto;max-height:440px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+thead th{padding:11px 18px;text-align:left;font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;background:var(--bg3);border-bottom:1.5px solid var(--border2);white-space:nowrap;position:sticky;top:0;z-index:1}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+tbody td{padding:13px 18px;color:var(--text2);vertical-align:middle}
+tbody td:first-child{color:var(--text);font-weight:600}
+.mono{font-family:var(--mono);font-size:.82rem}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;border-radius:100px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.badge.green{background:var(--green-bg);color:var(--green)}
+.badge.red{background:var(--red-bg);color:var(--red)}
+.badge.amber{background:var(--amber-bg);color:var(--amber)}
+.badge.blue{background:var(--accent-bg);color:var(--accent-l)}
+.badge.purple{background:var(--purple-bg);color:var(--purple)}
+.badge.gray{background:var(--bg4);color:var(--text3)}
+
+/* ROW ACTIONS */
+.row-actions{display:flex;gap:7px;opacity:0;transition:opacity .15s}
+tr:hover .row-actions{opacity:1}
+.row-btn{background:var(--bg4);border:1.5px solid var(--border2);color:var(--text2);border-radius:var(--r);padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
+.row-btn.green{background:var(--green-bg);border-color:rgba(34,197,94,.3);color:var(--green)}
+.row-btn.danger{background:var(--red-bg);border-color:rgba(248,113,113,.3);color:var(--red)}
+.row-btn:hover{color:var(--text);border-color:var(--accent);background:var(--accent-bg)}
+.row-btn.danger:hover{color:var(--red);border-color:rgba(248,113,113,.35);background:var(--red-bg)}
+.row-btn.green:hover{color:var(--green);border-color:rgba(34,197,94,.35);background:var(--green-bg)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r-xl);padding:32px;width:min(520px,96vw);max-height:88vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.6);animation:modalIn .22s cubic-bezier(.22,1,.36,1) both}
+@keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.modal-title{font-size:1.15rem;font-weight:700;color:var(--text);margin-bottom:20px}
+.modal-section{margin-bottom:16px}
+.modal-label{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;display:block}
+.modal-input{width:100%;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r);padding:11px 14px;font-size:.9rem;font-family:var(--sans);color:var(--text);outline:none;transition:border-color .2s}
+.modal-input:focus{border-color:var(--accent)}
+.modal-input::placeholder{color:var(--text4)}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.btn-primary{background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:10px 22px;font-size:.88rem;font-weight:600;cursor:pointer;font-family:var(--sans);transition:background .2s}
+.btn-primary:hover{background:var(--accent-l)}
+.btn-cancel{background:var(--bg3);color:var(--text2);border:1.5px solid var(--border2);border-radius:var(--r);padding:10px 22px;font-size:.88rem;font-weight:500;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.btn-cancel:hover{color:var(--text);border-color:var(--text4)}
+.btn-danger-full{background:rgba(248,113,113,.14);color:var(--red);border:1.5px solid rgba(248,113,113,.3);border-radius:var(--r);padding:10px 22px;font-size:.88rem;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.btn-danger-full:hover{background:rgba(248,113,113,.24)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;z-index:900;background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r-lg);padding:13px 18px;font-size:.88rem;color:var(--text);font-weight:500;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.45);opacity:0;pointer-events:none;max-width:360px;transform:translateY(8px);transition:all .25s cubic-bezier(.22,1,.36,1)}
+.toast.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.toast.success{border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
+.toast.error{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08)}
+.toast-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--accent)}
+.toast.success .toast-dot{background:var(--green)}
+.toast.error .toast-dot{background:var(--red)}
+
+/* INFO GRID */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.info-row{background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:16px 18px}
+.info-key{font-size:11px;color:var(--text4);text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:6px}
+.info-val{font-family:var(--mono);font-size:.85rem;color:var(--text);word-break:break-all;line-height:1.5}
+
+/* SCHOOL DETAIL */
+.school-detail{background:var(--bg2);border:1.5px solid var(--border2);border-radius:var(--r-lg);padding:24px;display:none;margin-top:4px}
+.school-detail.open{display:block}
+
+/* LOADING */
+.loading-row{padding:28px;text-align:center;color:var(--text3);font-size:.88rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:15px;height:15px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
+
+/* CODE BLOCK */
+.code-block{background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--r);padding:14px 16px;font-family:var(--mono);font-size:.82rem;color:var(--text2);overflow-x:auto;line-height:1.7;margin:10px 0}
+.code-block .k{color:var(--accent-l)}
+.code-block .s{color:var(--green)}
+
+/* EMPTY */
+.empty{padding:48px;text-align:center;color:var(--text4)}
+.empty-icon{font-size:2.2rem;margin-bottom:12px;opacity:.45}
+.empty-title{font-size:.95rem;font-weight:600;color:var(--text2);margin-bottom:5px}
+.empty-sub{font-size:.84rem;line-height:1.6}
+
+/* SETUP GUIDE */
+.guide-step{display:flex;gap:16px;margin-bottom:22px;align-items:flex-start}
+.guide-num{width:28px;height:28px;border-radius:50%;flex-shrink:0;background:var(--accent-bg);border:1.5px solid rgba(59,130,246,.25);color:var(--accent-l);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.guide-content h4{font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:6px}
+.guide-content p{font-size:.87rem;color:var(--text2);line-height:1.7}
+.guide-content code{font-family:var(--mono);font-size:.8rem;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:var(--accent-l)}
+
+/* DETAIL TABLE */
+.detail-table{width:100%;border-collapse:collapse;font-size:.86rem}
+.detail-table th{padding:9px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.05em;border-bottom:1.5px solid var(--border)}
+.detail-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text2)}
+.detail-table tr:last-child td{border-bottom:none}
+.detail-table tr:hover td{background:var(--bg3)}
+
+/* SEARCH RESULTS */
+.search-result-item{padding:12px 14px;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--r);margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.search-result-item:hover{border-color:var(--accent)}
+.search-result-name{font-size:.92rem;font-weight:600;color:var(--text);margin-bottom:3px}
+.search-result-sub{font-size:.8rem;color:var(--text3);font-family:var(--mono)}
+.search-group-label{font-size:11px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.08em;padding:14px 0 8px}
+
+/* BROADCAST */
+.broadcast-form{background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:20px;margin-bottom:16px}
+.bcast-type-row{display:flex;gap:7px;margin-bottom:13px;flex-wrap:wrap}
+.bcast-type-btn{flex:1;min-width:80px;border:1.5px solid var(--border2);border-radius:var(--r);padding:8px 6px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--sans);background:var(--bg3);color:var(--text3);text-align:center;transition:all .15s}
+.bcast-type-btn.active.info{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-l)}
+.bcast-type-btn.active.warning{background:var(--amber-bg);border-color:var(--amber);color:var(--amber)}
+.bcast-type-btn.active.urgent{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+
+/* HEALTH */
+.health-bar-bg{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-top:6px}
+.health-bar-fill{height:6px;border-radius:3px;transition:width .6s cubic-bezier(.22,1,.36,1)}
+.health-badge{display:inline-flex;align-items:center;border-radius:100px;padding:2px 9px;font-size:11px;font-weight:700}
+.health-badge.high{background:var(--green-bg);color:var(--green)}
+.health-badge.mid{background:var(--amber-bg);color:var(--amber)}
+.health-badge.low{background:var(--red-bg);color:var(--red)}
+
+/* MINI CHART */
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:40px}
+.mini-bar{flex:1;border-radius:2px 2px 0 0;background:var(--accent-bg);border:1px solid rgba(59,130,246,.2);min-height:4px;transition:background .2s}
+.mini-bar:hover{background:var(--accent-bg);border-color:var(--accent)}
+
+/* PIN SCREEN */
+#dev-pin-wall{position:fixed;inset:0;z-index:998;display:flex;align-items:center;justify-content:center;background:var(--bg);opacity:0;pointer-events:none;transition:opacity .3s ease}
+#dev-pin-wall.active{opacity:1;pointer-events:all}
+.pin-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-xl);padding:40px 36px;width:min(360px,92vw);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.pin-title{font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:6px}
+.pin-sub{font-size:.84rem;color:var(--text3);margin-bottom:28px;line-height:1.6}
+.pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:28px}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);background:transparent;transition:all .15s}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent);box-shadow:0 0 8px rgba(59,130,246,.5)}
+.pin-dot.err{background:var(--red);border-color:var(--red)}
+.pin-grid{display:grid;grid-template-columns:repeat(3,68px);gap:10px;justify-content:center}
+.pin-key{height:64px;border-radius:12px;background:var(--bg3);border:1.5px solid var(--border2);color:var(--text);font-size:1.5rem;font-weight:600;cursor:pointer;transition:background .15s,transform .1s;display:flex;align-items:center;justify-content:center}
+.pin-key:hover{background:var(--bg4)}
+.pin-key:active{transform:scale(.95)}
+.pin-key.empty{background:transparent;border-color:transparent;pointer-events:none}
+.pin-err-msg{font-size:.8rem;color:var(--red);min-height:18px;margin-top:12px;font-family:var(--mono)}
+.pin-attempts{font-size:.75rem;color:var(--text4);margin-top:8px;font-family:var(--mono)}
+.attempt-log{margin-top:16px;max-height:120px;overflow-y:auto}
+.attempt-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.75rem}
+.attempt-item:last-child{border-bottom:none}
+.attempt-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.attempt-dot.fail{background:var(--red)}
+.attempt-dot.ok{background:var(--green)}
+.attempt-time{color:var(--text4);font-family:var(--mono);flex-shrink:0}
+.attempt-email{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── AI ASSISTANT ── */
+#view-ai {
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+}
+.ai-wrap{display:flex;flex-direction:column;flex:1;min-height:0;gap:0}
+.ai-chat-area{flex:1;overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;min-height:400px;max-height:calc(100vh - 140px)}
+.ai-msg{display:flex;gap:10px;align-items:flex-start}
+.ai-msg.user{flex-direction:row-reverse}
+.ai-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;background:var(--bg3);border:1.5px solid var(--border2)}
+.ai-msg.user .ai-avatar{background:var(--accent-bg);border-color:rgba(59,130,246,.3)}
+.ai-bubble{max-width:82%;background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;font-size:.88rem;color:var(--text2);line-height:1.7;word-break:break-word}
+.ai-msg.user .ai-bubble{background:var(--accent-bg);border-color:rgba(59,130,246,.25);color:var(--text);border-radius:12px 4px 12px 12px}
+.ai-msg:not(.user) .ai-bubble{border-radius:4px 12px 12px 12px}
+.ai-bubble b{color:var(--text)}
+.ai-bubble code{font-family:var(--mono);font-size:.78rem;background:var(--bg3);border-radius:4px;padding:1px 6px;color:var(--accent-l)}
+.ai-bubble pre{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;overflow-x:auto;font-family:var(--mono);font-size:.78rem;color:var(--text2);line-height:1.6;margin:8px 0}
+.ai-action-card{margin-left:42px;border-radius:var(--r-lg);overflow:hidden;border:1.5px solid var(--border);font-size:.85rem;margin-bottom:4px}
+.ai-action-card.info{background:var(--accent-bg);border-color:rgba(59,130,246,.2);padding:10px 14px;color:var(--text2)}
+.ai-action-card.success{background:var(--green-bg);border-color:rgba(34,197,94,.2);padding:10px 14px;color:var(--text2)}
+.ai-action-card.error-card{background:var(--red-bg);border-color:rgba(248,113,113,.2);padding:10px 14px;color:var(--red)}
+.ai-action-card.table-card-ai{background:var(--bg2);border-radius:var(--r-lg);overflow:hidden}
+.ai-action-table{width:100%;border-collapse:collapse;font-size:.84rem}
+.ai-action-table thead tr{background:var(--bg3)}
+.ai-action-table th{padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.04em}
+.ai-action-table td{padding:9px 12px;border-top:1px solid var(--border);color:var(--text2);vertical-align:middle}
+.ai-action-table tbody tr:hover td{background:var(--bg3)}
+.ai-action-table td:first-child{color:var(--text);font-weight:600}
+.ai-typing{display:flex;gap:5px;align-items:center;padding:2px 0}
+.ai-typing span{width:7px;height:7px;border-radius:50%;background:var(--text3);animation:aiDot 1.2s ease-in-out infinite}
+.ai-typing span:nth-child(2){animation-delay:.2s}
+.ai-typing span:nth-child(3){animation-delay:.4s}
+@keyframes aiDot{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+.ai-input-row{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:9px;align-items:flex-end;background:var(--bg2);flex-shrink:0}
+.ai-quick-bar{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;gap:7px;flex-wrap:wrap;align-items:center;background:var(--bg2);flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.ai-quick-bar::-webkit-scrollbar{display:none}
+.ai-quick-btn{background:var(--bg3);border:1.5px solid var(--border2);color:var(--text3);border-radius:100px;padding:5px 13px;font-size:.76rem;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap;flex-shrink:0}
+.ai-quick-btn:hover{color:var(--accent-l);border-color:rgba(59,130,246,.3);background:var(--accent-bg)}
+.ai-status-pill{font-size:.75rem;font-family:var(--mono);padding:4px 10px;border-radius:100px;cursor:pointer;font-weight:600;border:1.5px solid transparent}
+.ai-status-pill.ready{background:var(--green-bg);border-color:rgba(34,197,94,.3);color:var(--green)}
+.ai-status-pill.no-key{background:var(--amber-bg);border-color:rgba(251,191,36,.3);color:var(--amber)}
+
+/* PRINT */
+@media print{
+  #auth-wall,.topbar,.sidebar,.modal-overlay,.toast{display:none!important}
+  body,html{overflow:visible!important;background:#fff!important;color:#000!important}
+  #app{display:block!important;height:auto!important}
+  .body-wrap{display:block!important}
+  .main{padding:12px!important;overflow:visible!important}
+  .view{display:block!important}
+  .view:not(.active){display:none!important}
+  .table-wrap{max-height:none!important;overflow:visible!important}
+  .stat-card{border:1px solid #ccc!important;background:#f9f9f9!important;break-inside:avoid}
+  .stat-val{color:#000!important}
+  table{font-size:11px!important}
+  thead th{background:#1F2937!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  tbody td{color:#000!important;border-bottom:1px solid #ddd!important}
+  .row-actions{display:none!important}
+  .print-hide{display:none!important}
+}
+
+/* MOBILE ≤600px */
+@media(max-width:600px){
+  html,body{overflow:auto;font-size:14px}
+  #app{height:auto;min-height:100vh;overflow:visible}
+  .body-wrap{flex-direction:column;overflow:visible}
+  .topbar{padding:0 10px;height:48px;position:sticky;top:0;z-index:100}
+  .topbar-badge,.topbar-user{display:none}
+  .topbar-logo{font-size:.88rem;gap:6px}
+  .topbar-right{gap:6px}
+  .btn-sm{padding:5px 9px;font-size:.72rem}
+  .btn-sm.print-hide{display:none}
+  .sidebar{width:100%;border-right:none;border-bottom:1px solid var(--border);flex-direction:row;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;padding:5px 8px;flex-shrink:0;-webkit-overflow-scrolling:touch;scrollbar-width:none;position:sticky;top:48px;z-index:99;background:var(--bg2)}
+  .sidebar::-webkit-scrollbar{display:none}
+  .sidebar-section,.sidebar-footer{display:none}
+  .nav-item{white-space:nowrap;flex-shrink:0;margin:2px 2px;padding:7px 11px;font-size:.76rem;border-radius:7px;gap:5px;min-height:34px;border:1px solid transparent}
+  .nav-badge{display:none}
+  .main{padding:10px;height:auto;overflow:visible;gap:10px}
+  .page-title{font-size:1rem}
+  .page-sub{font-size:.75rem;margin-top:2px}
+  .stats-row{grid-template-columns:1fr 1fr;gap:8px}
+  .stat-card{padding:12px 11px;border-radius:8px}
+  .stat-label{font-size:10px;margin-bottom:6px}
+  .stat-val{font-size:1.3rem}
+  .stat-sub{display:none}
+  .table-card{border-radius:8px}
+  .table-header{padding:10px 12px;flex-direction:column;align-items:stretch;gap:8px}
+  .table-title{font-size:.88rem}
+  .table-actions{display:flex;flex-direction:column;gap:7px}
+  .search-input{width:100%;font-size:.82rem;padding:8px 11px}
+  .table-actions .btn-sm{width:100%;justify-content:center;text-align:center}
+  .table-wrap{overflow-x:auto;overflow-y:visible;max-height:none;-webkit-overflow-scrolling:touch}
+  table{font-size:.76rem;min-width:520px}
+  thead th{padding:8px 9px;font-size:10px;letter-spacing:.02em;white-space:nowrap}
+  tbody td{padding:9px 9px}
+  .row-actions{opacity:1;flex-wrap:wrap;gap:4px}
+  .row-btn{padding:4px 8px;font-size:.68rem}
+  .info-grid{grid-template-columns:1fr;gap:8px}
+  .info-row{padding:12px 13px}
+  .info-val{font-size:.8rem}
+  .school-detail{padding:12px}
+  .modal-overlay{align-items:flex-end;padding:0}
+  .modal{border-radius:16px 16px 0 0;padding:18px 16px 32px;width:100%;max-height:88vh;border-left:none;border-right:none;border-bottom:none}
+  .auth-box{padding:26px 18px 32px;border-radius:18px 18px 0 0;width:100%;margin:0;position:fixed;bottom:0;left:0;right:0;max-height:90vh;overflow-y:auto;border-bottom:none;border-left:none;border-right:none}
+  .toast{right:8px;left:8px;max-width:none;bottom:12px;font-size:.8rem;padding:10px 14px}
+  .ai-chat-area{max-height:calc(100vh - 160px);min-height:auto}
+  .ai-quick-bar{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .ai-quick-bar::-webkit-scrollbar{display:none}
+  .ai-quick-btn{flex-shrink:0}
+  .ai-bubble{max-width:92%;font-size:.82rem}
+}
+
+/* TABLET */
+@media(min-width:601px) and (max-width:900px){
+  html,body{overflow:auto}
+  #app{height:auto;min-height:100vh}
+  .body-wrap{flex-direction:column}
+  .sidebar{width:100%;border-right:none;border-bottom:1px solid var(--border);flex-direction:row;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;padding:6px 10px;flex-shrink:0;-webkit-overflow-scrolling:touch;scrollbar-width:none;position:sticky;top:56px;z-index:99;background:var(--bg2)}
+  .sidebar::-webkit-scrollbar{display:none}
+  .sidebar-section,.sidebar-footer{display:none}
+  .nav-item{white-space:nowrap;flex-shrink:0;margin:2px 3px;padding:8px 14px}
+  .nav-badge{display:none}
+  .main{padding:16px;height:auto;overflow:visible}
+  .stats-row{grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .row-actions{opacity:1}
+  .topbar-user{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH WALL -->
+<div id="auth-wall">
+  <div style="display:flex;flex-direction:column;align-items:center;width:min(440px,94vw)">
+  <div class="auth-box" style="width:100%">
+    <div class="auth-logo"><span class="dot"></span>Student Bank — Dev Console</div>
+    <div class="auth-badge">SUPER ADMIN ACCESS ONLY</div>
+    <div class="auth-title">Developer Login</div>
+    <p class="auth-sub">This portal is restricted to the developer account only. All access attempts are verified against Firestore.</p>
+    <label class="auth-label">Email Address</label>
+    <input type="email" id="auth-email" class="auth-input" placeholder="developer@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('auth-pwd').focus()">
+    <label class="auth-label">Password</label>
+    <input type="password" id="auth-pwd" class="auth-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="auth-btn" id="login-btn" onclick="doLogin()">Authenticate →</button>
+    <div class="auth-err" id="auth-err"></div>
+    <div class="auth-info"><span style="font-size:16px;flex-shrink:0">🔐</span><span>Access is verified against the <code>superAdmins</code> Firestore collection. Your UID must exist there.</span></div>
+  </div>
+  </div>
+</div>
+
+<!-- PIN WALL -->
+<div id="dev-pin-wall">
+  <div class="pin-box">
+    <div style="font-size:28px;margin-bottom:10px">🔑</div>
+    <div class="pin-title" id="dp-title">Dev PIN Required</div>
+    <div class="pin-sub" id="dp-sub">Firebase login verified. Enter your 6-digit developer PIN to continue.</div>
+    <div class="pin-dots" id="dp-dots">
+      <div class="pin-dot" id="dp0"></div><div class="pin-dot" id="dp1"></div>
+      <div class="pin-dot" id="dp2"></div><div class="pin-dot" id="dp3"></div>
+      <div class="pin-dot" id="dp4"></div><div class="pin-dot" id="dp5"></div>
+    </div>
+    <div id="dp-numpad">
+      <div class="pin-grid">
+        <div class="pin-key" onclick="dpKey('1')">1</div><div class="pin-key" onclick="dpKey('2')">2</div><div class="pin-key" onclick="dpKey('3')">3</div>
+        <div class="pin-key" onclick="dpKey('4')">4</div><div class="pin-key" onclick="dpKey('5')">5</div><div class="pin-key" onclick="dpKey('6')">6</div>
+        <div class="pin-key" onclick="dpKey('7')">7</div><div class="pin-key" onclick="dpKey('8')">8</div><div class="pin-key" onclick="dpKey('9')">9</div>
+        <div class="pin-key empty"></div><div class="pin-key" onclick="dpKey('0')">0</div><div class="pin-key" onclick="dpDel()" style="font-size:1.1rem">⌫</div>
+      </div>
+    </div>
+    <div class="pin-err-msg" id="dp-err"></div>
+    <div class="pin-attempts" id="dp-attempts"></div>
+    <div style="margin-top:16px"><button onclick="dpLogout()" style="background:none;border:none;color:var(--text4);font-size:.78rem;cursor:pointer;font-family:var(--sans);text-decoration:underline">Cancel — Logout</button></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"><span class="toast-dot"></span><span id="toast-msg"></span></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo"><span class="dot"></span>Dev Console</div>
+      <span class="topbar-badge">SUPER ADMIN</span>
+    </div>
+    <div class="topbar-right">
+      <div class="conn-pill"><span class="dot"></span><span id="conn-label">Live</span></div>
+      <span class="topbar-user" id="dev-email"></span>
+      <button class="btn-sm print-hide" onclick="exportAllData()" title="Export all data as Excel">📊 Export</button>
+      <button class="btn-sm" onclick="showSettingsModal()" title="Settings">⚙️ Settings</button>
+      <button class="btn-sm danger" onclick="doLogout()">⏻ Out</button>
+    </div>
+  </div>
+
+  <div class="body-wrap">
+    <nav class="sidebar">
+      <div class="sidebar-section">AI</div>
+      <div class="nav-item ai-nav active" data-view="ai" onclick="switchView('ai')"><span class="nav-icon">🤖</span>AI Assistant</div>
+      <div class="sidebar-section">Overview</div>
+      <div class="nav-item" data-view="overview" onclick="switchView('overview')"><span class="nav-icon">📊</span>Dashboard<span class="nav-badge" id="nb-schools">—</span></div>
+      <div class="nav-item" data-view="schools" onclick="switchView('schools')"><span class="nav-icon">🏫</span>All Schools<span class="nav-badge" id="nb-schools2">—</span></div>
+      <div class="sidebar-section">Data</div>
+      <div class="nav-item" data-view="students" onclick="switchView('students')"><span class="nav-icon">👤</span>All Students<span class="nav-badge" id="nb-students">—</span></div>
+      <div class="nav-item" data-view="teachers" onclick="switchView('teachers')"><span class="nav-icon">👩‍🏫</span>All Teachers<span class="nav-badge" id="nb-teachers">—</span></div>
+      <div class="nav-item" data-view="transactions" onclick="switchView('transactions')"><span class="nav-icon">💳</span>Transactions<span class="nav-badge" id="nb-txns">—</span></div>
+      <div class="sidebar-section">Tools</div>
+      <div class="nav-item" data-view="search" onclick="switchView('search')"><span class="nav-icon">🔍</span>Global Search</div>
+      <div class="nav-item" data-view="broadcast" onclick="switchView('broadcast')"><span class="nav-icon">📣</span>Broadcast</div>
+      <div class="nav-item" data-view="tools" onclick="switchView('tools')"><span class="nav-icon">🛠</span>Dev Tools</div>
+      <div class="nav-item" data-view="deleted" onclick="switchView('deleted')"><span class="nav-icon">🗑</span>Deleted Log<span class="nav-badge" id="nb-deleted">—</span></div>
+      <div class="nav-item" data-view="backup" onclick="switchView('backup')"><span class="nav-icon">💾</span>Backups</div>
+      <div class="nav-item" data-view="setup" onclick="switchView('setup')"><span class="nav-icon">📖</span>Setup Guide</div>
+      <div class="sidebar-footer">
+        <div style="margin-bottom:8px"><button onclick="loadAllData()" style="width:100%;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r);padding:5px 10px;font-size:.74rem;font-weight:600;color:var(--text3);cursor:pointer;font-family:var(--sans)">🔄 Refresh Data</button></div>
+        <div>Student Bank Dev Console</div>
+        <div id="footer-time">—</div>
+      </div>
+    </nav>
+
+    <main class="main">
+
+      <!-- ══ AI ASSISTANT (FIRST / DEFAULT VIEW) ══ -->
+      <div class="view active" id="view-ai" style="gap:0;padding:0;margin:-28px;height:calc(100vh - 56px);overflow:hidden">
+        <!-- Header bar -->
+        <div style="padding:14px 22px;border-bottom:1px solid rgba(139,92,246,.2);background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(59,130,246,.05));display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div>
+              <div style="font-size:1.1rem;font-weight:700;color:var(--text)">🤖 AI Assistant</div>
+              <div style="font-size:.78rem;color:var(--text4);margin-top:1px">Powered by Groq — searches, analyses, broadcasts, navigates your entire platform</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="ai-key-status" class="ai-status-pill no-key" onclick="showSettingsModal()" title="Click to manage API key"></span>
+            <button class="btn-sm" onclick="clearAiChat()">🗑 Clear</button>
+          </div>
+        </div>
+        <!-- Quick action bar -->
+        <div class="ai-quick-bar">
+          <span style="font-size:.72rem;color:var(--text4);font-weight:700;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0">Quick:</span>
+          <span style="font-size:.68rem;color:var(--text4);flex-shrink:0;opacity:.6">Press / anywhere</span>
+          <button class="ai-quick-btn" onclick="aiQuick('Give me a full platform summary with schools, students, and total savings')">📊 Platform Summary</button>
+          <button class="ai-quick-btn" onclick="aiQuick('Show me a visual chart of all schools — students and savings')">📈 Visual Charts</button>
+          <button class="ai-quick-btn" onclick="aiQuick('Show top 10 students by balance')">💰 Top Balances</button>
+          <button class="ai-quick-btn" onclick="aiQuick('Show the last 15 transactions across all schools')">📋 Recent Transactions</button>
+          <button class="ai-quick-btn" onclick="aiQuick('Are there any students with zero or negative balance?')">⚠️ Zero Balance</button>
+          <button class="ai-quick-btn" onclick="aiQuick('Run a complete platform health report with visual scores')">💡 Health Report</button>
+          <button class="ai-quick-btn" onclick="aiQuick('Export a PDF report of all students')">📄 Export PDF</button>
+          <button class="ai-quick-btn" onclick="aiQuick('Export all transactions as Excel file')">📊 Export Excel</button>
+        </div>
+        <!-- Chat messages -->
+        <div id="ai-messages" class="ai-chat-area"></div>
+        <!-- Input -->
+        <div class="ai-input-row">
+          <textarea id="ai-input" class="modal-input" rows="2" maxlength="4000"
+            placeholder='Ask anything — "Stats for ZPHS Omerga", "Export PDF", "Reset PIN for Rahul", "Send holiday broadcast"… Enter or Ctrl+Enter'
+            style="resize:none;flex:1;min-width:0"
+            onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter'){event.preventDefault();sendAiMsg();}else if(event.key==='Enter'&&!event.shiftKey&&window.innerWidth>600){event.preventDefault();sendAiMsg();}"></textarea>
+          <button class="btn-primary" id="ai-send-btn" onclick="sendAiMsg()" style="flex-shrink:0;align-self:flex-end;min-width:72px">Send</button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="view" id="view-overview">
+        <div><div class="page-title">Dashboard</div><div class="page-sub">Live snapshot across all schools on the platform</div></div>
+        <div class="stats-row">
+          <div class="stat-card c-blue"><div class="stat-label">Total Schools</div><div class="stat-val" id="ov-schools">—</div><div class="stat-sub">Active on platform</div></div>
+          <div class="stat-card c-green"><div class="stat-label">Total Students</div><div class="stat-val" id="ov-students">—</div><div class="stat-sub">Across all schools</div></div>
+          <div class="stat-card c-purple"><div class="stat-label">Total Teachers</div><div class="stat-val" id="ov-teachers">—</div><div class="stat-sub">Registered accounts</div></div>
+          <div class="stat-card c-amber"><div class="stat-label">Transactions</div><div class="stat-val" id="ov-txns">—</div><div class="stat-sub">All time</div></div>
+          <div class="stat-card c-green"><div class="stat-label">Total Savings</div><div class="stat-val" id="ov-savings">—</div><div class="stat-sub">Sum of all balances</div></div>
+          <div class="stat-card"><div class="stat-label">Avg per School</div><div class="stat-val" id="ov-avg">—</div><div class="stat-sub">Students per school</div></div>
+        </div>
+        <!-- Dashboard Charts -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px" id="dash-charts-row">
+          <div class="table-card" style="padding:16px">
+            <div style="font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📊 Students per School</div>
+            <div style="position:relative;height:200px"><canvas id="dash-chart-students"></canvas></div>
+          </div>
+          <div class="table-card" style="padding:16px">
+            <div style="font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">💰 Savings per School</div>
+            <div style="position:relative;height:200px"><canvas id="dash-chart-savings"></canvas></div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">Schools Overview</div><div style="font-size:.84rem;color:var(--text3)">Click a row to drill in</div></div>
+          <div class="table-wrap"> <table> <thead> <tr><th>School Name</th><th>Code</th><th class="col-hide">Manager</th><th>Students</th><th>Teachers</th><th>Total Savings</th><th>Last Rollover</th><th></th></tr> </thead> <tbody id="ov-table"> <tr><td colspan="8" class="loading-row"><span class="spinner"></span>Loading…</td></tr> </tbody> </table> </div>
+        </div>
+      </div>
+
+      <!-- ALL SCHOOLS -->
+      <div class="view" id="view-schools">
+        <div><div class="page-title">All Schools</div><div class="page-sub">Every registered school with full details and management actions</div></div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Schools Registry</div>
+            <div class="table-actions"><input type="search" class="search-input" placeholder="Search schools…" oninput="filterSchools(this.value)"><button class="btn-sm" onclick="loadAllSchools()">Refresh</button></div>
+          </div>
+          <div class="table-wrap"> <table> <thead> <tr><th>School Name</th><th>Code</th><th class="col-hide">Manager UID</th><th class="col-hide">Invite Code</th><th>Students</th><th>Teachers</th><th>Last Rollover</th><th>Actions</th></tr> </thead> <tbody id="schools-table"> <tr><td colspan="8" class="loading-row"><span class="spinner"></span>Loading…</td></tr> </tbody> </table> </div>
+        </div>
+        <div class="school-detail" id="school-detail-panel"></div>
+      </div>
+
+      <!-- ALL STUDENTS -->
+      <div class="view" id="view-students">
+        <div><div class="page-title">All Students</div><div class="page-sub">Every student account across every school</div></div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Students Registry</div>
+            <div class="table-actions"><input type="search" class="search-input" placeholder="Search name, account, school…" oninput="filterStudents(this.value)"><button class="btn-sm print-hide" onclick="exportStudentsCSV()">📋 CSV</button><button class="btn-sm print-hide" onclick="exportAiPDF('students',null)">📄 PDF</button></div>
+          </div>
+          <div class="table-wrap"> <table> <thead> <tr><th>Name</th><th>Account No.</th><th>School</th><th>Class</th><th>Balance</th><th>KYC</th><th>PIN Set</th><th>Transactions</th></tr> </thead> <tbody id="students-table"> <tr><td colspan="8" class="loading-row"><span class="spinner"></span>Loading…</td></tr> </tbody> </table> </div>
+        </div>
+      </div>
+
+      <!-- ALL TEACHERS -->
+      <div class="view" id="view-teachers">
+        <div><div class="page-title">All Teachers</div><div class="page-sub">Every teacher account across every school</div></div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Teachers Registry</div>
+            <div class="table-actions"><input type="search" class="search-input" placeholder="Search name, email, school…" oninput="filterTeachers(this.value)"></div>
+          </div>
+          <div class="table-wrap"> <table> <thead> <tr><th>Name</th><th>Email</th><th>School</th><th>Role</th><th>Status</th><th>PIN Set</th><th>Joined</th><th>Actions</th></tr> </thead> <tbody id="teachers-table"> <tr><td colspan="8" class="loading-row"><span class="spinner"></span>Loading…</td></tr> </tbody> </table> </div>
+        </div>
+      </div>
+
+      <!-- TRANSACTIONS -->
+      <div class="view" id="view-transactions">
+        <div><div class="page-title">All Transactions</div><div class="page-sub">Complete transaction history across all schools (latest 500 shown)</div></div>
+        <div class="stats-row">
+          <div class="stat-card c-green"><div class="stat-label">Total Deposits</div><div class="stat-val" id="tx-deps">—</div></div>
+          <div class="stat-card"><div class="stat-label">Total Withdrawals</div><div class="stat-val" id="tx-wds">—</div></div>
+          <div class="stat-card c-amber"><div class="stat-label">Net Balance</div><div class="stat-val" id="tx-net">—</div></div>
+          <div class="stat-card c-blue"><div class="stat-label">Count</div><div class="stat-val" id="tx-count">—</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+          <div class="table-card" style="padding:16px">
+            <div style="font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">💳 Deposits vs Withdrawals</div>
+            <div style="position:relative;height:180px"><canvas id="tx-chart-doughnut"></canvas></div>
+          </div>
+          <div class="table-card" style="padding:16px">
+            <div style="font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">📊 Per School Breakdown</div>
+            <div style="position:relative;height:180px"><canvas id="tx-chart-bar"></canvas></div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Transaction Log</div>
+            <div class="table-actions"><input type="search" class="search-input" placeholder="Search student, school…" oninput="filterTxns(this.value)"><button class="btn-sm print-hide" onclick="exportTxnsCSV()">📋 CSV</button><button class="btn-sm print-hide" onclick="exportAiPDF('transactions',null)">📄 PDF</button></div>
+          </div>
+          <div class="table-wrap"> <table> <thead> <tr><th>Date</th><th>Student</th><th>School</th><th>Type</th><th>Category</th><th>Amount</th><th>Note</th><th>By</th></tr> </thead> <tbody id="txns-table"> <tr><td colspan="8" class="loading-row"><span class="spinner"></span>Loading…</td></tr> </tbody> </table> </div>
+        </div>
+      </div>
+
+      <!-- GLOBAL SEARCH -->
+      <div class="view" id="view-search">
+        <div><div class="page-title">Global Search</div><div class="page-sub">Search across all schools, students, and teachers simultaneously</div></div>
+        <div class="table-card">
+          <div class="table-header"><input type="search" class="search-input" style="width:100%;max-width:420px" placeholder="Type to search everything…" id="global-search-input" oninput="globalSearch(this.value)"></div>
+          <div id="search-results" style="padding:18px"><div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Start typing to search</div><div class="empty-sub">Searches school names, student names, account numbers, teacher emails</div></div></div>
+        </div>
+      </div>
+
+      <!-- BROADCAST -->
+      <div class="view" id="view-broadcast">
+        <div><div class="page-title">Broadcast Message</div><div class="page-sub">Send an announcement to every school on the platform simultaneously</div></div>
+        <div class="broadcast-form">
+          <div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:12px">Compose Announcement</div>
+          <div class="bcast-type-row">
+            <div class="bcast-type-btn active info" onclick="selectBcastType('info',this)">ℹ️ Info</div>
+            <div class="bcast-type-btn warning" onclick="selectBcastType('warning',this)">⚠️ Warning</div>
+            <div class="bcast-type-btn urgent" onclick="selectBcastType('urgent',this)">🚨 Urgent</div>
+          </div>
+          <div style="margin-bottom:11px"><label class="modal-label">Title *</label><input type="text" class="modal-input" id="bcast-title" placeholder="e.g. System maintenance on Sunday" maxlength="80"></div>
+          <div style="margin-bottom:16px"><label class="modal-label">Message (optional)</label><textarea class="modal-input" id="bcast-body" placeholder="Details for all schools…" rows="3" maxlength="300" style="resize:none"></textarea></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="btn-primary" onclick="sendBroadcast()" id="bcast-btn">📣 Send to All Schools</button>
+            <div style="font-size:.8rem;color:var(--text3)" id="bcast-target-count">— schools will receive this</div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">Recent Broadcasts</div><div style="font-size:.82rem;color:var(--text3)">Last 10 sent by super admin</div></div>
+          <div id="bcast-history" style="padding:14px 20px"><div class="empty"><div class="empty-icon">📣</div><div class="empty-title">No broadcasts yet</div></div></div>
+        </div>
+      </div>
+
+      <!-- DEV TOOLS -->
+      <div class="view" id="view-tools">
+        <div><div class="page-title">Dev Tools</div><div class="page-sub">Administrative utilities — platform maintenance and emergency actions</div></div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">🔓 Reset Student PIN</div></div>
+          <div style="padding:18px 20px">
+            <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px;line-height:1.65">Select a school first to avoid ambiguity. Then search by account number or name.</p>
+            <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:4px">
+              <div style="flex:0 0 200px"><label class="modal-label">Filter by School</label><select class="modal-input" id="tool-pin-school" onchange="searchPinStudents(document.getElementById('tool-pin-acc').value)" style="width:100%"><option value="">All Schools</option></select></div>
+              <div style="flex:1;min-width:200px"><label class="modal-label">Account Number or Name</label><input type="text" class="modal-input" id="tool-pin-acc" placeholder="e.g. SB001 or student name" oninput="searchPinStudents(this.value)"></div>
+              <button class="btn-primary" onclick="searchPinStudents(document.getElementById('tool-pin-acc').value)">Search</button>
+            </div>
+            <div id="tool-pin-results" style="margin-top:12px"></div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">🔄 Reset School Invite Code</div></div>
+          <div style="padding:18px 20px">
+            <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px;line-height:1.65">Generate a new invite code for a school. The old code stops working immediately.</p>
+            <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">
+              <div style="flex:1;min-width:180px"><label class="modal-label">School Code</label><select class="modal-input" id="tool-invite-school" style="cursor:pointer"><option value="">— select a school —</option></select></div>
+              <button class="btn-primary" onclick="resetSchoolInvite()">Generate New Code</button>
+            </div>
+            <div id="tool-invite-result" style="margin-top:10px;font-size:.82rem;min-height:18px"></div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">💡 Platform Health</div><button class="btn-sm" onclick="renderHealthScores()">Recalculate</button></div>
+          <div id="health-chart-wrap" style="padding:16px;display:none"><div style="position:relative;height:160px"><canvas id="health-bar-chart"></canvas></div></div>
+          <div id="health-list" style="padding:6px 0"><div class="empty"><div class="empty-icon">💡</div><div class="empty-title">Click Recalculate to run health check</div></div></div>
+        </div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">🧹 Orphan Data Finder</div><button class="btn-sm" onclick="findOrphans()">Scan</button></div>
+          <div id="orphan-results" style="padding:18px 20px"><div class="empty"><div class="empty-icon">🧹</div><div class="empty-title">Click Scan to find orphaned records</div><div class="empty-sub">Transactions with no matching student, fees for deleted students</div></div></div>
+        </div>
+      </div>
+
+      <!-- DELETED LOG -->
+      <div class="view" id="view-deleted">
+        <div><div class="page-title">Deleted Transaction Log</div><div class="page-sub">Every deleted transaction, student, and announcement — nothing disappears without a trace</div></div>
+        <div class="stats-row" style="margin:4px 0">
+          <div class="stat-card c-red"><div class="stat-label">Deleted Transactions</div><div class="stat-val" id="del-txn-count">—</div></div>
+          <div class="stat-card c-amber"><div class="stat-label">Deleted Students</div><div class="stat-val" id="del-stu-count">—</div></div>
+          <div class="stat-card"><div class="stat-label">Bulk Resets</div><div class="stat-val" id="del-reset-count">—</div></div>
+          <div class="stat-card c-purple"><div class="stat-label">Total Amount</div><div class="stat-val" id="del-money">—</div><div class="stat-sub" id="del-money-sub">Across all deleted</div></div>
+        </div>
+        <div class="table-card">
+          <div class="table-header">
+            <div class="table-title">Deletion Audit Trail</div>
+            <div class="table-actions">
+              <select class="search-input" id="del-filter-school" onchange="filterDeletedLog()" style="width:160px"><option value="">All Schools</option></select>
+              <select class="search-input" id="del-filter-type" onchange="filterDeletedLog()" style="width:140px"><option value="">All Types</option><option value="transaction">Transactions</option><option value="student">Students</option><option value="announcement">Announcements</option><option value="bulk_reset">Bulk Resets</option></select>
+              <button class="btn-sm" onclick="loadDeletedLog()">Refresh</button>
+            </div>
+          </div>
+          <div class="table-wrap"> <table> <thead> <tr><th>When</th><th>Type</th><th>School</th><th>Detail</th><th>Amount</th><th>Deleted By</th><th>Reason</th><th>Action</th></tr> </thead> <tbody id="deleted-table"> <tr><td colspan="8" class="loading-row"><span class="spinner"></span>Load deleted log to view</td></tr> </tbody> </table> </div>
+        </div>
+      </div>
+
+      <!-- BACKUP -->
+      <div class="view" id="view-backup">
+        <div><div class="page-title">Data Backup System</div><div class="page-sub">Snapshot entire platform data to Firestore. Restore any school to any previous snapshot.</div></div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">Create Snapshot</div></div>
+          <div style="padding:20px">
+            <p style="font-size:.86rem;color:var(--text2);margin-bottom:16px;line-height:1.65">Takes a full snapshot of all schools, students, teachers and transactions. Does not affect live data.</p>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px"><label class="modal-label">Snapshot Label (optional)</label><input type="text" class="modal-input" id="backup-label" placeholder="e.g. Before year-end rollover" maxlength="100"></div>
+              <button class="btn-primary" onclick="createBackup()" id="backup-btn" style="margin-top:18px">💾 Create Snapshot</button>
+            </div>
+            <div id="backup-progress" style="margin-top:12px;font-size:.82rem;color:var(--text3);font-family:var(--mono)"></div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">Snapshot History</div><div class="table-actions"><button class="btn-sm" onclick="loadBackupHistory()">Refresh</button></div></div>
+          <div id="backup-history" style="padding:14px 20px"><div class="empty"><div class="empty-icon">💾</div><div class="empty-title">No snapshots yet</div></div></div>
+        </div>
+      </div>
+
+      <!-- SETUP GUIDE -->
+      <div class="view" id="view-setup">
+        <div><div class="page-title">Setup Guide</div><div class="page-sub">How this portal is secured and how to configure a developer account</div></div>
+        <div class="table-card">
+          <div class="table-header"><div class="table-title">Initial Setup — Firestore superAdmins Collection</div></div>
+          <div style="padding:28px">
+            <div class="guide-step"><div class="guide-num">1</div><div class="guide-content"><h4>Find your Firebase UID</h4><p>Firebase Console → Authentication → Users → copy UID.</p></div></div>
+            <div class="guide-step"><div class="guide-num">2</div><div class="guide-content"><h4>Create the superAdmins collection</h4><p>Firestore → Start Collection → ID: <code>superAdmins</code> → Document ID = your UID → Field: <code>role</code> = <code>superAdmin</code></p></div></div>
+            <div class="guide-step"><div class="guide-num">3</div><div class="guide-content"><h4>Add AI Assistant key</h4><p>Go to <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent-l)">console.groq.com/keys</a>, get a free Groq key, then open ⚙️ Settings in the topbar and paste it. Saved to Firestore — works everywhere.</p></div></div>
+            <div class="guide-step"><div class="guide-num">4</div><div class="guide-content"><h4>Deploy to Netlify</h4><p>Drag and drop this HTML file to Netlify as a separate site. Use a non-obvious URL slug.</p></div></div>
+            <div style="margin-top:8px;padding:14px 16px;background:var(--amber-bg);border:1.5px solid rgba(251,191,36,.2);border-radius:var(--r)">
+              <div style="font-size:12px;color:var(--amber);font-weight:700;margin-bottom:6px">Your Current Developer UID</div>
+              <div class="mono" id="my-uid" style="font-size:.85rem;color:var(--text2)">Log in to see your UID here</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+/* ── FIREBASE CONFIG ── */
+const firebaseConfig = {
+  apiKey: "AIzaSyBYqZM7i7khg3eYCn_O6bs_4XvT38boFyA",
+  authDomain: "noted-style-459801-n4.firebaseapp.com",
+  projectId: "noted-style-459801-n4",
+  storageBucket: "noted-style-459801-n4.firebasestorage.app",
+  messagingSenderId: "96820525235",
+  appId: "1:96820525235:web:476e911667964e236f58c6"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+
+const SUPER_ADMIN_UID = '';
+let _sessionPinPassed = false;
+let _appInitialized   = false;
+const S = { user:null, schools:[], allStudents:[], allTeachers:[], allTxns:[], loaded:false };
+const _loginAttempts = [];
+let _dpBuffer = '', _dpAttempts = 0;
+
+/* ── UTILS ── */
+function fmt(n){ return '₹'+Number(n||0).toLocaleString('en-IN'); }
+function fmtDate(ts){ if(!ts)return'—'; const ms=ts.toMillis?ts.toMillis():(typeof ts==='number'?ts:0); if(!ms)return'—'; return new Date(ms).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+function esc(s){ const d=document.createElement('div');d.textContent=s||'';return d.innerHTML; }
+let _toastTimer;
+function toast(msg,type=''){ const el=document.getElementById('toast'); document.getElementById('toast-msg').textContent=msg; el.className='toast show'+(type?' '+type:''); clearTimeout(_toastTimer); _toastTimer=setTimeout(()=>el.classList.remove('show'),3400); }
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+function openModal(html){ document.getElementById('modal-body').innerHTML=html; document.getElementById('modal').classList.add('open'); }
+
+/* ── AUTH ── */
+let _userInitiatedLogin = false;
+
+auth.onAuthStateChanged(async user=>{
+  if(!user){ showAuth(); return; }
+  try{
+    const doc=await db.collection('superAdmins').doc(user.uid).get();
+    if(!doc.exists){
+      if(SUPER_ADMIN_UID&&user.uid===SUPER_ADMIN_UID){ onSuperAdminAuth(user); }
+      else{ await auth.signOut(); if(_userInitiatedLogin) document.getElementById('auth-err').textContent='Unauthorized — your account is not a super admin.'; showAuth(); }
+      return;
+    }
+    onSuperAdminAuth(user);
+  }catch(e){ await auth.signOut(); if(_userInitiatedLogin) document.getElementById('auth-err').textContent='Verification failed: '+e.message; showAuth(); }
+});
+
+function showAuth(){
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('auth-wall').classList.remove('fade-out');
+  document.getElementById('auth-err').textContent='';
+  const btn=document.getElementById('login-btn'); btn.disabled=false; btn.textContent='Authenticate →';
+}
+
+async function doLogin(){
+  const email=document.getElementById('auth-email').value.trim();
+  const pwd=document.getElementById('auth-pwd').value;
+  const err=document.getElementById('auth-err'); err.textContent='';
+  if(!email||!pwd){err.textContent='Please fill in both fields.';return;}
+  const btn=document.getElementById('login-btn'); btn.disabled=true; btn.textContent='Verifying…';
+  try{
+    _userInitiatedLogin=true;
+    await auth.signInWithEmailAndPassword(email,pwd);
+    logAttempt(email,true);
+  }catch(e){
+    const map={'auth/user-not-found':'No account found with that email.','auth/wrong-password':'Incorrect password.','auth/invalid-credential':'Invalid email or password.','auth/too-many-requests':'Too many attempts — wait a few minutes.'};
+    err.textContent=map[e.code]||e.message;
+    logAttempt(email,false);
+    btn.disabled=false; btn.textContent='Authenticate →';
+  }
+}
+
+async function doLogout(){ _userInitiatedLogin=false; hideDevPin(); await auth.signOut(); S.loaded=false; S.schools=[]; showAuth(); }
+
+function onSuperAdminAuth(user){
+  S.user=user;
+  document.getElementById('dev-email').textContent=user.email;
+  if(document.getElementById('my-uid')) document.getElementById('my-uid').textContent=user.uid;
+  if(_sessionPinPassed){ return; }
+  const wall=document.getElementById('auth-wall');
+  wall.classList.add('fade-out');
+  setTimeout(showDevPin,320);
+}
+
+function loadMainApp(){
+  _sessionPinPassed=true;
+  if(_appInitialized){ return; }
+  _appInitialized=true;
+  const pinWall=document.getElementById('dev-pin-wall');
+  const app=document.getElementById('app');
+  pinWall.classList.remove('active');
+  setTimeout(()=>{ app.classList.add('visible'); },280);
+  updateClock(); setInterval(updateClock,1000);
+  loadAllData();
+  loadAiKeyFromFirestore();
+  // Ensure AI view initialises if it's the active tab
+  if (document.getElementById('view-ai').classList.contains('active')) {
+    initAiView();
+  }
+}
+
+function updateClock(){ const el=document.getElementById('footer-time'); if(el)el.textContent=new Date().toLocaleTimeString('en-IN'); }
+
+// Press '/' to focus AI, Escape to close modal
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'){
+    e.preventDefault(); switchView('ai');
+    setTimeout(()=>{ const inp=document.getElementById('ai-input'); if(inp)inp.focus(); },100);
+  }
+  if(e.key==='Escape')closeModal();
+});
+
+/* ── LOGIN ATTEMPT LOG ── */
+function logAttempt(email,success){
+  _loginAttempts.unshift({email,success,time:new Date().toLocaleTimeString('en-IN')});
+  if(_loginAttempts.length>6)_loginAttempts.pop();
+  renderAttemptLog();
+}
+function renderAttemptLog(){
+  let logEl=document.getElementById('attempt-log');
+  if(!logEl){
+    logEl=document.createElement('div'); logEl.id='attempt-log'; logEl.style.cssText='margin-top:14px;width:100%';
+    const wrapper=document.querySelector('#auth-wall > div');
+    (wrapper||document.getElementById('auth-wall')).appendChild(logEl);
+  }
+  if(!_loginAttempts.length){logEl.innerHTML='';return;}
+  logEl.innerHTML=`<div style="font-size:11px;color:var(--text4);font-family:var(--mono);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Recent attempts</div>
+    <div class="attempt-log table-card" style="padding:4px 14px">
+      ${_loginAttempts.map(a=>`<div class="attempt-item"><div class="attempt-dot ${a.success?'ok':'fail'}"></div><div class="attempt-time">${a.time}</div><div class="attempt-email">${esc(a.email)} — ${a.success?'✓ OK':'✗ Failed'}</div></div>`).join('')}
+    </div>`;
+}
+
+/* ── DEV PIN ── */
+const MAX_PIN_ATTEMPTS=5;
+async function sha256(str){ const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str)); return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+
+async function showDevPin(){
+  _dpBuffer=''; _dpAttempts=0;
+  const wall=document.getElementById('dev-pin-wall');
+  const titleEl=document.getElementById('dp-title'), subEl=document.getElementById('dp-sub'), errEl=document.getElementById('dp-err'), attEl=document.getElementById('dp-attempts');
+  wall.classList.add('active');
+  errEl.textContent=''; attEl.textContent='';
+  for(let i=0;i<6;i++){const d=document.getElementById('dp'+i);if(d)d.classList.remove('filled','err');}
+  try{
+    const doc=await db.collection('superAdmins').doc(S.user.uid).get();
+    const data=doc.data()||{};
+    if(data.devPinLocked){ titleEl.textContent='Account Locked'; subEl.textContent='Too many wrong PIN attempts. Go to Firestore → superAdmins/'+S.user.uid+' → set devPinLocked=false to unlock.'; document.getElementById('dp-numpad').style.display='none'; errEl.textContent='Contact yourself via Firestore to unlock.'; errEl.style.color='var(--amber)'; return; }
+    if(!data.devPinHash){ titleEl.textContent='Set Your Dev PIN'; subEl.textContent='No PIN set. Enter a new 6-digit PIN to secure this portal.'; wall.dataset.mode='setup'; wall.dataset.setupStep='1'; wall.dataset.firstPin=''; }
+    else { titleEl.textContent='Dev PIN Required'; subEl.textContent='Firebase login verified. Enter your 6-digit developer PIN to continue.'; wall.dataset.mode='verify'; }
+    document.getElementById('dp-numpad').style.display='';
+  }catch(e){ errEl.textContent='Firestore error: '+e.message; }
+}
+
+function hideDevPin(){
+  const wall=document.getElementById('dev-pin-wall');
+  wall.classList.remove('active');
+  document.getElementById('dp-numpad').style.display='';
+  wall.dataset.mode=''; wall.dataset.setupStep=''; wall.dataset.firstPin='';
+  document.getElementById('dp-title').textContent='Dev PIN Required';
+  document.getElementById('dp-sub').textContent='Firebase login verified. Enter your 6-digit developer PIN to continue.';
+}
+
+function dpKey(k){
+  if(_dpBuffer.length>=6)return;
+  _dpBuffer+=k;
+  document.getElementById('dp'+(_dpBuffer.length-1)).classList.add('filled');
+  if(_dpBuffer.length===6)setTimeout(_handlePinComplete,120);
+}
+function dpDel(){
+  if(!_dpBuffer.length)return;
+  document.getElementById('dp'+(_dpBuffer.length-1)).classList.remove('filled');
+  _dpBuffer=_dpBuffer.slice(0,-1);
+}
+function _resetDots(addErr=false){
+  _dpBuffer='';
+  for(let i=0;i<6;i++){const d=document.getElementById('dp'+i);if(!d)return;d.classList.remove('filled');if(addErr)d.classList.add('err');else d.classList.remove('err');}
+  if(addErr)setTimeout(()=>{for(let i=0;i<6;i++){const d=document.getElementById('dp'+i);if(d)d.classList.remove('err');}},600);
+}
+
+async function _handlePinComplete(){
+  const wall=document.getElementById('dev-pin-wall');
+  const mode=wall.dataset.mode, errEl=document.getElementById('dp-err'), attEl=document.getElementById('dp-attempts'), subEl=document.getElementById('dp-sub');
+  if(mode==='setup'){
+    const step=wall.dataset.setupStep;
+    if(step==='1'){ wall.dataset.firstPin=_dpBuffer; wall.dataset.setupStep='2'; _resetDots(); subEl.textContent='Confirm your PIN — enter it again to save.'; errEl.textContent=''; }
+    else {
+      if(_dpBuffer!==wall.dataset.firstPin){ _resetDots(true); wall.dataset.setupStep='1'; wall.dataset.firstPin=''; errEl.textContent='PINs did not match — start again'; subEl.textContent='Enter a new 6-digit PIN to secure this portal.'; return; }
+      try{
+        const hash=await sha256(_dpBuffer);
+        await db.collection('superAdmins').doc(S.user.uid).update({devPinHash:hash,devPinSet:firebase.firestore.FieldValue.serverTimestamp(),devPinLocked:false,devPinFailCount:0});
+        toast('PIN set successfully — you are now logged in','success');
+        hideDevPin(); loadMainApp();
+      }catch(e){ errEl.textContent='Failed to save PIN: '+e.message; _resetDots(); }
+    }
+    return;
+  }
+  try{
+    const doc=await db.collection('superAdmins').doc(S.user.uid).get();
+    const data=doc.data()||{};
+    const hash=await sha256(_dpBuffer);
+    if(hash===data.devPinHash){
+      await db.collection('superAdmins').doc(S.user.uid).update({devPinFailCount:0,devPinLastLogin:firebase.firestore.FieldValue.serverTimestamp()});
+      hideDevPin(); _dpAttempts=0; loadMainApp();
+    } else {
+      _dpAttempts++;
+      const failCount=(data.devPinFailCount||0)+1;
+      const remaining=MAX_PIN_ATTEMPTS-failCount;
+      _resetDots(true);
+      if(failCount>=MAX_PIN_ATTEMPTS){
+        await db.collection('superAdmins').doc(S.user.uid).update({devPinLocked:true,devPinFailCount:failCount});
+        errEl.textContent='Account locked — too many wrong attempts';
+        errEl.style.color='var(--red)';
+        document.getElementById('dp-numpad').style.display='none';
+        setTimeout(dpLogout,2500);
+      } else {
+        await db.collection('superAdmins').doc(S.user.uid).update({devPinFailCount:failCount});
+        errEl.textContent='Incorrect PIN — '+remaining+' attempt'+(remaining!==1?'s':'')+' remaining';
+      }
+    }
+  }catch(e){ errEl.textContent='Error: '+e.message; _resetDots(); }
+}
+
+function dpLogout(){ hideDevPin(); doLogout(); }
+
+/* ── CHANGE PIN ── */
+function showChangePinModal(){
+  openModal(`
+    <div class="modal-title">🔑 Change Dev PIN</div>
+    <p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Your new PIN will be hashed with SHA-256 and stored in Firestore.</p>
+    <div class="modal-section"><label class="modal-label">New 6-digit PIN</label><input type="password" class="modal-input" id="new-pin-1" placeholder="••••••" maxlength="6" inputmode="numeric" pattern="[0-9]*"></div>
+    <div class="modal-section"><label class="modal-label">Confirm New PIN</label><input type="password" class="modal-input" id="new-pin-2" placeholder="••••••" maxlength="6" inputmode="numeric" pattern="[0-9]*"></div>
+    <div id="change-pin-err" style="font-size:.82rem;color:var(--red);min-height:18px;margin-bottom:4px"></div>
+    <div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="executeChangePin()">Save New PIN</button></div>
+  `);
+}
+async function executeChangePin(){
+  const p1=document.getElementById('new-pin-1').value.trim();
+  const p2=document.getElementById('new-pin-2').value.trim();
+  const errEl=document.getElementById('change-pin-err');
+  if(!/^\d{6}$/.test(p1)){errEl.textContent='PIN must be exactly 6 digits';return;}
+  if(p1!==p2){errEl.textContent='PINs do not match';return;}
+  try{
+    const hash=await sha256(p1);
+    await db.collection('superAdmins').doc(S.user.uid).update({devPinHash:hash,devPinChanged:firebase.firestore.FieldValue.serverTimestamp(),devPinFailCount:0,devPinLocked:false});
+    await db.collection('devAuditLog').add({action:'changePIN',by:S.user.email,at:firebase.firestore.FieldValue.serverTimestamp()});
+    closeModal(); toast('PIN changed successfully','success');
+  }catch(e){errEl.textContent='Error: '+e.message;}
+}
+
+/* ── SETTINGS MODAL ── */
+function showSettingsModal(){
+  const masked=_groqKey?_groqKey.slice(0,8)+'…'+_groqKey.slice(-4):'';
+  openModal(`
+    <div class="modal-title">⚙️ Settings</div>
+    <div style="margin-bottom:20px">
+      <div style="font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:6px">🤖 Groq API Key <span style="font-size:.75rem;font-weight:400;color:var(--green)">— free</span></div>
+      <p style="font-size:.83rem;color:var(--text3);margin-bottom:12px;line-height:1.6">Get a free key at <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent-l)">console.groq.com/keys</a> — sign up with Google, one click. Saved to Firestore — works on any device automatically.</p>
+      ${masked?`<div style="font-size:.8rem;color:var(--green);font-family:var(--mono);margin-bottom:10px">✓ Current key: ${masked}</div>`:'<div style="font-size:.8rem;color:var(--amber);margin-bottom:10px">⚠ No key saved — AI Assistant is disabled</div>'}
+      <label class="modal-label">${masked?'Replace Key':'Add Key'} (starts with gsk_…)</label>
+      <input type="password" class="modal-input" id="settings-groq-key" placeholder="gsk_…" autocomplete="off">
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-primary" onclick="saveAiKeyFromSettings()">💾 Save Key</button>
+        ${masked?'<button class="btn-cancel" onclick="clearAiKeyFromSettings()">Remove Key</button>':''}
+      </div>
+      <div id="settings-key-msg" style="font-size:.8rem;margin-top:10px;font-family:var(--mono);min-height:18px"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:18px">
+      <div style="font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:10px">🔑 Developer PIN</div>
+      <button class="btn-cancel" onclick="closeModal();showChangePinModal()">Change Dev PIN</button>
+    </div>
+    <div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Close</button></div>
+  `);
+}
+async function saveAiKeyFromSettings(){
+  const val=(document.getElementById('settings-groq-key')?.value||'').trim();
+  const msgEl=document.getElementById('settings-key-msg');
+  if(!val){if(msgEl){msgEl.textContent='Enter a key first';msgEl.style.color='var(--red)';}return;}
+  try{
+    await db.collection('superAdmins').doc(S.user.uid).update({groqApiKey:val});
+    _groqKey=val; updateAiKeyStatus();
+    if(msgEl){msgEl.textContent='✓ Saved — AI ready on any device!';msgEl.style.color='var(--green)';}
+    toast('Groq key saved to Firestore','success');
+    setTimeout(closeModal,1200);
+  }catch(e){if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.style.color='var(--red)';}toast('Save failed','error');}
+}
+async function clearAiKeyFromSettings(){
+  try{
+    await db.collection('superAdmins').doc(S.user.uid).update({groqApiKey:''});
+    _groqKey=''; updateAiKeyStatus(); toast('Key cleared'); closeModal();
+  }catch(e){toast('Error: '+e.message,'error');}
+}
+
+/* ── DATA LOADING ── */
+async function loadAllData(){
+  toast('Loading all school data…');
+  try{
+    const schoolsSnap=await db.collection('schools').get();
+    S.schools=[]; S.allStudents=[]; S.allTeachers=[]; S.allTxns=[];
+    await Promise.all(schoolsSnap.docs.map(async schoolDoc=>{
+      const school={id:schoolDoc.id,...schoolDoc.data(),_students:[],_teachers:[],_txns:[]};
+      const [studSnap,tchSnap,txnSnap]=await Promise.all([
+        db.collection('schools').doc(school.id).collection('students').get(),
+        db.collection('schools').doc(school.id).collection('teachers').get(),
+        db.collection('schools').doc(school.id).collection('transactions').get(),
+      ]);
+      school._students=studSnap.docs.map(d=>({id:d.id,...d.data(),_schoolId:school.id,_schoolName:school.name||school.id}));
+      school._teachers=tchSnap.docs.map(d=>({id:d.id,...d.data(),_schoolId:school.id,_schoolName:school.name||school.id}));
+      school._txns=txnSnap.docs.map(d=>({id:d.id,...d.data(),_schoolId:school.id,_schoolName:school.name||school.id}));
+      S.schools.push(school); S.allStudents.push(...school._students); S.allTeachers.push(...school._teachers); S.allTxns.push(...school._txns);
+    }));
+    S.loaded=true; updateBadges(); renderOverview(); renderSchoolsTable(S.schools); renderStudentsTable(S.allStudents); renderTeachersTable(S.allTeachers); renderTxnsTable(S.allTxns);
+    populateSchoolSelect();
+    toast('All data loaded — '+S.schools.length+' schools','success');
+    updateAiKeyStatus();
+  }catch(e){ toast('Error loading data: '+e.message,'error'); console.error(e); }
+}
+async function loadAllSchools(){ await loadAllData(); }
+
+function updateBadges(){
+  document.getElementById('nb-schools').textContent=S.schools.length;
+  document.getElementById('nb-schools2').textContent=S.schools.length;
+  document.getElementById('nb-students').textContent=S.allStudents.length;
+  document.getElementById('nb-teachers').textContent=S.allTeachers.length;
+  document.getElementById('nb-txns').textContent=S.allTxns.length;
+}
+
+/* ── NAVIGATION ── */
+function switchView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  const viewEl=document.getElementById('view-'+v);
+  const navEl=document.querySelector(`.nav-item[data-view="${v}"]`);
+  if(viewEl)viewEl.classList.add('active');
+  if(navEl)navEl.classList.add('active');
+  if(v==='broadcast'){renderBroadcastTargetCount();renderBroadcastHistory();}
+  if(v==='tools'){populateSchoolSelect();if(S.loaded)renderHealthScores();}
+  if(v==='deleted'){loadDeletedLog();}
+  if(v==='backup'){loadBackupHistory();}
+  if(v==='ai'){initAiView();}
+}
+
+/* ── OVERVIEW ── */
+let _dashCharts=[];
+function renderOverview(){
+  document.getElementById('ov-schools').textContent=S.schools.length;
+  document.getElementById('ov-students').textContent=S.allStudents.length;
+  document.getElementById('ov-teachers').textContent=S.allTeachers.filter(t=>t.status!=='removed').length;
+  document.getElementById('ov-txns').textContent=S.allTxns.length;
+  const totalSavings=S.allStudents.reduce((acc,s)=>{ const open=parseFloat(s.openingBalance)||0; const deps=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+t.amount,0); const wds=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+t.amount,0); return acc+open+deps-wds; },0);
+  document.getElementById('ov-savings').textContent=fmt(totalSavings);
+  document.getElementById('ov-avg').textContent=S.schools.length?Math.round(S.allStudents.length/S.schools.length):0;
+  // Render dashboard charts with retry
+  _dashCharts.forEach(c=>{try{c.destroy();}catch(e){}});_dashCharts=[];
+  const attemptCharts = () => {
+    if (typeof Chart === 'undefined') {
+      setTimeout(attemptCharts, 200);
+      return;
+    }
+    const colors=['#3B82F6','#22C55E','#C084FC','#FBBF24','#F87171','#60A5FA','#34D399','#A78BFA','#FCD34D','#F97316'];
+    const labels=S.schools.map(sc=>sc.name||sc.id);
+    const stuData=S.schools.map(sc=>sc._students.length);
+    const savData=S.schools.map(sc=>Math.round(sc._students.reduce((acc,s)=>{const d=sc._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);const w=sc._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);return acc+(parseFloat(s.openingBalance)||0)+d-w;},0)));
+    const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1F2937',titleColor:'#F9FAFB',bodyColor:'#D1D5DB',borderColor:'#4B5563',borderWidth:1}},scales:{x:{ticks:{color:'#6B7280',font:{size:9}},grid:{color:'rgba(55,65,81,.4)'}},y:{ticks:{color:'#6B7280',font:{size:9}},grid:{color:'rgba(55,65,81,.4)'}}}};
+    const c1=document.getElementById('dash-chart-students');
+    const c2=document.getElementById('dash-chart-savings');
+    if(c1){_dashCharts.push(new Chart(c1,{type:'bar',data:{labels,datasets:[{data:stuData,backgroundColor:colors.slice(0,labels.length).map(c=>c+'BB'),borderColor:colors.slice(0,labels.length),borderWidth:1.5,borderRadius:5}]},options:{...base}}));}
+    if(c2){_dashCharts.push(new Chart(c2,{type:'bar',data:{labels,datasets:[{data:savData,backgroundColor:'rgba(34,197,94,.65)',borderColor:'#22C55E',borderWidth:1.5,borderRadius:5}]},options:{...base,scales:{...base.scales,y:{...base.scales.y,ticks:{color:'#6B7280',font:{size:9},callback:v=>'₹'+Number(v).toLocaleString('en-IN')}}}}}));}
+  };
+  attemptCharts();
+  const tbody=document.getElementById('ov-table');
+  if(!S.schools.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">🏫</div><div class="empty-title">No schools found</div></div></td></tr>`;return;}
+  tbody.innerHTML=[...S.schools].sort((a,b)=>b._students.length-a._students.length).map(school=>{
+    const totalBal=school._students.reduce((acc,s)=>{ const deps=school._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+t.amount,0); const wds=school._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+t.amount,0); return acc+(parseFloat(s.openingBalance)||0)+deps-wds; },0);
+    const mgr=school._teachers.find(t=>t.role==='manager');
+    return `<tr style="cursor:pointer" onclick="drillSchool('${school.id}')"><td>${esc(school.name||school.id)}</td><td><span class="mono badge blue">${esc(school.id)}</span></td><td class="col-hide">${esc(mgr?.name||'—')}</td><td><span class="badge green">${school._students.length}</span></td><td>${school._teachers.filter(t=>t.status!=='removed').length}</td><td style="color:var(--green);font-weight:600">${fmt(totalBal)}</td><td class="mono">${fmtDate(school.lastRollover)}</td><td><button class="row-btn" onclick="event.stopPropagation();drillSchool('${school.id}')">Details →</button></td></tr>`;
+  }).join('');
+}
+
+/* ── SCHOOLS ── */
+function renderSchoolsTable(schools){
+  const tbody=document.getElementById('schools-table');
+  if(!schools.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">🏫</div><div class="empty-title">No schools</div></div></td></tr>`;return;}
+  tbody.innerHTML=schools.map(school=>{
+    return `<tr><td>${esc(school.name||school.id)}</td><td><span class="mono badge blue">${esc(school.id)}</span></td><td class="mono col-hide" style="font-size:.78rem;max-width:130px;overflow:hidden;text-overflow:ellipsis">${esc(school.managerUid||'—')}</td><td class="col-hide"><span class="mono badge gray">${esc(school.inviteCode||'—')}</span></td><td>${school._students.length}</td><td>${school._teachers.filter(t=>t.status!=='removed').length}</td><td class="mono">${fmtDate(school.lastRollover)}</td><td><div class="row-actions"><button class="row-btn" onclick="drillSchool('${school.id}')">Details</button><button class="row-btn green" onclick="exportSchoolData('${school.id}')">📊 Excel</button><button class="row-btn danger" onclick="confirmDeleteSchool('${school.id}','${esc(school.name||school.id)}')">Delete</button></div></td></tr>`;
+  }).join('');
+}
+function filterSchools(q){ renderSchoolsTable(S.schools.filter(s=>(s.name||s.id).toLowerCase().includes(q.toLowerCase()))); }
+
+function drillSchool(schoolId){
+  switchView('schools');
+  const school=S.schools.find(s=>s.id===schoolId); if(!school)return;
+  const panel=document.getElementById('school-detail-panel');
+  const totalDeps=school._txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+t.amount,0);
+  const totalWds=school._txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+t.amount,0);
+  const totalBal=school._students.reduce((acc,s)=>{ const deps=school._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+t.amount,0); const wds=school._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+t.amount,0); return acc+(parseFloat(s.openingBalance)||0)+deps-wds; },0);
+  panel.innerHTML=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div><div style="font-size:1.15rem;font-weight:700;color:var(--text);margin-bottom:4px">${esc(school.name||school.id)}</div><div class="mono" style="font-size:.82rem;color:var(--text3)">${school.id} · ${school._students.length} students · ${school._teachers.filter(t=>t.status!=='removed').length} teachers</div></div>
+      <div style="display:flex;gap:9px;flex-wrap:wrap">
+        <button class="btn-sm" onclick="exportSchoolData('${school.id}')">📊 Export Excel</button>
+        <button class="btn-sm" onclick="exportAiPDF('school_detail','${school.id}')">📄 PDF</button>
+        <button class="btn-sm danger" onclick="confirmDeleteSchool('${school.id}','${esc(school.name||school.id)}')">Delete School</button>
+      </div>
+    </div>
+    <div class="info-grid" style="margin-bottom:18px">
+      <div class="info-row"><div class="info-key">Total Deposits</div><div class="info-val" style="color:var(--green)">${fmt(totalDeps)}</div></div>
+      <div class="info-row"><div class="info-key">Total Withdrawals</div><div class="info-val" style="color:var(--red)">${fmt(totalWds)}</div></div>
+      <div class="info-row"><div class="info-key">Net Balance</div><div class="info-val">${fmt(totalBal)}</div></div>
+      <div class="info-row"><div class="info-key">Invite Code</div><div class="info-val">${esc(school.inviteCode||'—')}</div></div>
+    </div>
+    <div style="font-size:.88rem;font-weight:600;color:var(--text);margin-bottom:10px">Students</div>
+    <div style="overflow-x:auto"><table class="detail-table">
+      <thead><tr><th>Name</th><th>Account</th><th>Class</th><th>Balance</th><th>Transactions</th></tr></thead>
+      <tbody>${school._students.map(s=>{ const deps=school._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+t.amount,0); const wds=school._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+t.amount,0); const bal=(parseFloat(s.openingBalance)||0)+deps-wds; return `<tr><td>${esc(s.name||'—')}</td><td class="mono">${esc(s.accountNo||s.id)}</td><td>${esc(s.class||'—')}</td><td style="color:var(--green)">${fmt(bal)}</td><td>${school._txns.filter(t=>t.studentId===s.id).length}</td></tr>`; }).join('')||'<tr><td colspan="5" style="text-align:center;padding:14px;color:var(--text4)">No students</td></tr>'}</tbody>
+    </table></div>`;
+  panel.classList.add('open');
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  setTimeout(()=>{
+    if(typeof Chart==='undefined')return;
+    const cid='dc_'+schoolId.replace(/[^a-z0-9]/gi,'_');
+    const existing=document.getElementById(cid); if(existing&&existing._chart){try{existing._chart.destroy();}catch(e){}}
+    const cd=document.createElement('div');
+    cd.style.cssText='margin-top:18px;';
+    cd.innerHTML='<div style="font-size:.82rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📊 Balance per Student</div><div style="position:relative;height:180px"><canvas id="'+cid+'"></canvas></div>';
+    panel.appendChild(cd);
+    const cv=document.getElementById(cid); if(!cv)return;
+    const bals=school._students.slice(0,15).map(s=>{const d=school._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);const w=school._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);return Math.round((parseFloat(s.openingBalance)||0)+d-w);});
+    const c=new Chart(cv,{type:'bar',data:{labels:school._students.slice(0,15).map(s=>s.name||s.accountNo||s.id),datasets:[{data:bals,backgroundColor:bals.map(v=>v>=0?'rgba(34,197,94,.7)':'rgba(248,113,113,.7)'),borderColor:bals.map(v=>v>=0?'#22C55E':'#F87171'),borderWidth:1.5,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1F2937',titleColor:'#F9FAFB',bodyColor:'#D1D5DB',borderColor:'#4B5563',borderWidth:1}},scales:{x:{ticks:{color:'#6B7280',font:{size:9}},grid:{color:'rgba(55,65,81,.4)'}},y:{ticks:{color:'#6B7280',font:{size:9},callback:v=>'₹'+Number(v).toLocaleString('en-IN')},grid:{color:'rgba(55,65,81,.4)'}}}}}); cv._chart=c;
+  },80);
+}
+
+/* ── STUDENTS ── */
+function renderStudentsTable(students){
+  const tbody=document.getElementById('students-table');
+  if(!students.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">👤</div><div class="empty-title">No students</div></div></td></tr>`;return;}
+  tbody.innerHTML=students.map(s=>{
+    const deps=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+    const wds=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+    const bal=(parseFloat(s.openingBalance)||0)+deps-wds;
+    const txnCount=S.allTxns.filter(t=>t.studentId===s.id).length;
+    return `<tr><td>${esc(s.name||'—')}</td><td class="mono">${esc(s.accountNo||s.id)}</td><td>${esc(s._schoolName||'—')}</td><td>${esc(s.class||'—')}</td><td style="color:var(--green);font-weight:600">${fmt(bal)}</td><td><span class="badge ${s.kycVerified?'green':'gray'}">${s.kycVerified?'✓ KYC':'—'}</span></td><td><span class="badge ${s.pinHash?'green':'gray'}">${s.pinHash?'Set':'—'}</span></td><td>${txnCount}</td></tr>`;
+  }).join('');
+  // Update tx stats
+  const deps=S.allTxns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+  const wds=S.allTxns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+  if(document.getElementById('tx-deps')) document.getElementById('tx-deps').textContent=fmt(deps);
+  if(document.getElementById('tx-wds')) document.getElementById('tx-wds').textContent=fmt(wds);
+  if(document.getElementById('tx-net')) document.getElementById('tx-net').textContent=fmt(deps-wds);
+  if(document.getElementById('tx-count')) document.getElementById('tx-count').textContent=S.allTxns.length;
+}
+function filterStudents(q){ const lq=q.toLowerCase(); renderStudentsTable(S.allStudents.filter(s=>(s.name||'').toLowerCase().includes(lq)||(s.accountNo||'').toLowerCase().includes(lq)||(s._schoolName||'').toLowerCase().includes(lq)||(s.class||'').toLowerCase().includes(lq))); }
+
+/* ── TEACHERS ── */
+function renderTeachersTable(teachers){
+  const tbody=document.getElementById('teachers-table');
+  if(!teachers.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">👩‍🏫</div><div class="empty-title">No teachers</div></div></td></tr>`;return;}
+  tbody.innerHTML=teachers.map(t=>`<tr><td>${esc(t.name||'—')}</td><td class="mono" style="font-size:.8rem">${esc(t.email||'—')}</td><td>${esc(t._schoolName||'—')}</td><td><span class="badge ${t.role==='manager'?'purple':'blue'}">${t.role||'teacher'}</span></td><td><span class="badge ${t.status==='removed'?'red':'green'}">${t.status||'active'}</span></td><td><span class="badge ${t.pinHash?'green':'gray'}">${t.pinHash?'Set':'—'}</span></td><td class="mono">${fmtDate(t.createdAt)}</td><td><div class="row-actions"><button class="row-btn danger" onclick="confirmRemoveTeacher('${t.id}','${t._schoolId}','${esc(t.name||t.id)}')">Remove</button></div></td></tr>`).join('');
+}
+function filterTeachers(q){ const lq=q.toLowerCase(); renderTeachersTable(S.allTeachers.filter(t=>(t.name||'').toLowerCase().includes(lq)||(t.email||'').toLowerCase().includes(lq)||(t._schoolName||'').toLowerCase().includes(lq))); }
+
+/* ── TRANSACTIONS ── */
+let _txCharts=[];
+function renderTxnsTable(txns){
+  const t200=[...txns].sort((a,b)=>(b.createdAt?.toMillis?.()??0)-(a.createdAt?.toMillis?.()??0)).slice(0,500);
+  const tbody=document.getElementById('txns-table');
+  if(!t200.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">💳</div><div class="empty-title">No transactions</div></div></td></tr>`;return;}
+  tbody.innerHTML=t200.map(t=>`<tr><td class="mono">${fmtDate(t.createdAt)}</td><td>${esc(t.studentName||t.studentId||'—')}</td><td>${esc(t._schoolName||'—')}</td><td><span class="badge ${t.type==='deposit'?'green':'red'}">${t.type||'—'}</span></td><td>${esc(t.category||'—')}</td><td style="font-weight:600;color:${t.type==='deposit'?'var(--green)':'var(--red)'}">${fmt(t.amount)}</td><td style="color:var(--text3);font-size:.82rem">${esc(t.note||'—')}</td><td class="mono" style="font-size:.78rem;color:var(--text4)">${esc(t.createdByName||t.createdBy||'—')}</td></tr>`).join('');
+  const deps=txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+  const wds=txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+  if(document.getElementById('tx-deps')) document.getElementById('tx-deps').textContent=fmt(deps);
+  if(document.getElementById('tx-wds')) document.getElementById('tx-wds').textContent=fmt(wds);
+  if(document.getElementById('tx-net')) document.getElementById('tx-net').textContent=fmt(deps-wds);
+  if(document.getElementById('tx-count')) document.getElementById('tx-count').textContent=txns.length;
+  // Transaction charts with retry
+  _txCharts.forEach(c=>{try{c.destroy();}catch(e){}});_txCharts=[];
+  const attemptCharts = () => {
+    if (typeof Chart === 'undefined') {
+      setTimeout(attemptCharts, 200);
+      return;
+    }
+    const deps=txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+    const wds=txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+    const c1=document.getElementById('tx-chart-doughnut');
+    const c2=document.getElementById('tx-chart-bar');
+    const tip={backgroundColor:'#1F2937',titleColor:'#F9FAFB',bodyColor:'#D1D5DB',borderColor:'#4B5563',borderWidth:1};
+    if(c1){_txCharts.push(new Chart(c1,{type:'doughnut',data:{labels:['Deposits','Withdrawals'],datasets:[{data:[Math.round(deps),Math.round(wds)],backgroundColor:['rgba(34,197,94,.8)','rgba(248,113,113,.8)'],borderColor:'#111827',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#9CA3AF',font:{size:10}}},tooltip:tip}}}));}
+    if(c2){
+      const sl=S.schools.map(sc=>sc.name||sc.id);
+      const sd=S.schools.map(sc=>Math.round(sc._txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0)));
+      const sw=S.schools.map(sc=>Math.round(sc._txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0)));
+      _txCharts.push(new Chart(c2,{
+        type:'bar',
+        data:{labels:sl,datasets:[
+          {label:'Deposits',data:sd,backgroundColor:'rgba(34,197,94,.7)',borderColor:'#22C55E',borderWidth:1.5,borderRadius:4},
+          {label:'Withdrawals',data:sw,backgroundColor:'rgba(248,113,113,.7)',borderColor:'#F87171',borderWidth:1.5,borderRadius:4}
+        ]},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{labels:{color:'#9CA3AF',font:{size:10}}},tooltip:tip},
+          scales:{
+            x:{ticks:{color:'#6B7280',font:{size:9}},grid:{color:'rgba(55,65,81,.4)'}},
+            y:{ticks:{color:'#6B7280',font:{size:9}},grid:{color:'rgba(55,65,81,.4)'}}
+          }
+        }
+      }));
+    }
+  };
+  attemptCharts();
+}
+function filterTxns(q){ const lq=q.toLowerCase(); renderTxnsTable(S.allTxns.filter(t=>(t.studentName||'').toLowerCase().includes(lq)||(t._schoolName||'').toLowerCase().includes(lq)||(t.note||'').toLowerCase().includes(lq))); }
+
+/* ── GLOBAL SEARCH ── */
+let _searchTimer;
+function globalSearch(q){ clearTimeout(_searchTimer); _searchTimer=setTimeout(()=>_doGlobalSearch(q),200); }
+function _doGlobalSearch(q){
+  const el=document.getElementById('search-results');
+  if(!q||q.length<2){el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">Start typing to search</div></div>';return;}
+  const lq=q.toLowerCase();
+  const schools=S.schools.filter(s=>(s.name||s.id).toLowerCase().includes(lq));
+  const students=S.allStudents.filter(s=>(s.name||'').toLowerCase().includes(lq)||(s.accountNo||s.id).toLowerCase().includes(lq));
+  const teachers=S.allTeachers.filter(t=>(t.name||'').toLowerCase().includes(lq)||(t.email||'').toLowerCase().includes(lq));
+  let html='';
+  if(!schools.length&&!students.length&&!teachers.length){el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No results for "'+esc(q)+'"</div></div>';return;}
+  if(schools.length){html+=`<div class="search-group-label">Schools (${schools.length})</div>`+schools.slice(0,5).map(s=>`<div class="search-result-item" onclick="drillSchool('${s.id}')"><div class="search-result-name">${esc(s.name||s.id)}</div><div class="search-result-sub">${s._students.length} students · ${s._teachers.filter(t=>t.status!=='removed').length} teachers</div></div>`).join('');}
+  if(students.length){html+=`<div class="search-group-label">Students (${students.length})</div>`+students.slice(0,8).map(s=>{ const deps=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0); const wds=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0); const bal=(parseFloat(s.openingBalance)||0)+deps-wds; return `<div class="search-result-item"><div class="search-result-name">${esc(s.name||'—')} <span style="font-family:var(--mono);font-size:.78rem;color:var(--accent-l)">${esc(s.accountNo||s.id)}</span></div><div class="search-result-sub">${esc(s._schoolName||'—')} · Balance: ${fmt(bal)}</div></div>`; }).join('');}
+  if(teachers.length){html+=`<div class="search-group-label">Teachers (${teachers.length})</div>`+teachers.slice(0,5).map(t=>`<div class="search-result-item"><div class="search-result-name">${esc(t.name||'—')}</div><div class="search-result-sub">${esc(t.email||'—')} · ${esc(t._schoolName||'—')} · ${t.role||'teacher'}</div></div>`).join('');}
+  el.innerHTML=html;
+}
+
+/* ── SCHOOL ACTIONS ── */
+function confirmDeleteSchool(schoolId,name){
+  openModal(`<div class="modal-title" style="color:var(--red)">Delete School</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Permanently delete school "<strong>${esc(name)}</strong>"? This removes the school document only — students and transactions remain.</p><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger-full" onclick="executeDeleteSchool('${schoolId}','${esc(name)}')">Delete School</button></div>`);
+}
+async function executeDeleteSchool(schoolId,name){
+  closeModal(); toast('Deleting school…');
+  try{
+    await db.collection('schools').doc(schoolId).delete();
+    await db.collection('devAuditLog').add({action:'deleteSchool',schoolId,name,by:S.user.email,at:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('School deleted','success'); await loadAllData();
+  }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+function confirmRemoveTeacher(uid,schoolId,name){
+  openModal(`<div class="modal-title" style="color:var(--amber)">Remove Teacher</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Remove "<strong>${esc(name)}</strong>" from school? Sets their status to removed.</p><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger-full" onclick="executeRemoveTeacher('${uid}','${schoolId}','${esc(name)}')">Remove</button></div>`);
+}
+async function executeRemoveTeacher(uid,schoolId,name){
+  closeModal(); toast('Removing teacher…');
+  try{
+    await db.collection('schools').doc(schoolId).collection('teachers').doc(uid).update({status:'removed',removedAt:firebase.firestore.FieldValue.serverTimestamp(),removedBy:S.user.email});
+    await db.collection('devAuditLog').add({action:'removeTeacher',uid,schoolId,name,by:S.user.email,at:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('Teacher removed','success'); await loadAllData();
+  }catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+/* ── BROADCAST ── */
+let _bcastType='info';
+function selectBcastType(type,btn){
+  _bcastType=type;
+  document.querySelectorAll('.bcast-type-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function renderBroadcastTargetCount(){ const el=document.getElementById('bcast-target-count'); if(el)el.textContent=S.schools.length+' school'+(S.schools.length!==1?'s':'')+' will receive this'; }
+async function sendBroadcast(){
+  const title=document.getElementById('bcast-title').value.trim();
+  const body=document.getElementById('bcast-body').value.trim();
+  if(!title){toast('Enter a broadcast title','error');return;}
+  const btn=document.getElementById('bcast-btn'); btn.disabled=true; btn.textContent='Sending…';
+  try{
+    const payload={title,body,type:_bcastType,postedBy:S.user.uid,postedByName:'Super Admin',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const batch=db.batch();
+    S.schools.forEach(school=>{ const ref=db.collection('schools').doc(school.id).collection('announcements').doc(); batch.set(ref,payload); });
+    await batch.commit();
+    await db.collection('devAuditLog').add({action:'broadcast',title,type:_bcastType,schoolCount:S.schools.length,by:S.user.email,at:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('Broadcast sent to '+S.schools.length+' schools','success');
+    document.getElementById('bcast-title').value='';
+    document.getElementById('bcast-body').value='';
+    renderBroadcastHistory();
+  }catch(e){ toast('Broadcast failed: '+e.message,'error'); }
+  finally{ btn.disabled=false; btn.textContent='📣 Send to All Schools'; }
+}
+async function renderBroadcastHistory(){
+  const el=document.getElementById('bcast-history');
+  try{
+    // Simple query — no composite index needed
+    const snap=await db.collection('devAuditLog').orderBy('at','desc').limit(20).get();
+    const broadcasts=snap.docs.filter(d=>['broadcast','aiBroadcast'].includes(d.data().action));
+    if(!broadcasts.length){el.innerHTML='<div class="empty"><div class="empty-icon">📣</div><div class="empty-title">No broadcasts yet</div></div>';return;}
+    el.innerHTML=broadcasts.slice(0,10).map(d=>{
+      const b=d.data();
+      const when=b.at?.toDate?b.at.toDate().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+      const typeColor=b.type==='urgent'?'var(--red)':b.type==='warning'?'var(--amber)':'var(--accent-l)';
+      return `<div style="padding:14px 20px;border-bottom:1px solid var(--border)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="color:${typeColor};font-size:.8rem;font-weight:700;text-transform:uppercase">${b.type||'info'}</span><span style="font-size:.9rem;font-weight:600;color:var(--text)">${esc(b.title||'—')}</span>${b.source==='ai'?'<span class="badge blue" style="font-size:10px">🤖 AI</span>':''}</div><div style="font-size:.78rem;color:var(--text4);font-family:var(--mono)">${when} · ${b.schoolCount||S.schools.length} schools · by ${esc(b.by||'—')}</div></div>`;
+    }).join('');
+  }catch(e){
+    // Fallback: no index needed query
+    el.innerHTML=`<div style="padding:16px 20px;font-size:.83rem;color:var(--text3)">Broadcast history requires a Firestore index on <code style="font-family:var(--mono)">devAuditLog</code> (at desc). <a href="https://console.firebase.google.com/project/noted-style-459801-n4/firestore/indexes" target="_blank" style="color:var(--accent-l)">Create index →</a></div>`;
+  }
+}
+
+/* ── DEV TOOLS ── */
+function searchPinStudents(query){
+  const schoolFilter=document.getElementById('tool-pin-school')?.value||'';
+  const q=(query||'').toLowerCase().trim();
+  const el=document.getElementById('tool-pin-results');
+  if(!q){el.innerHTML='';return;}
+  let results=S.allStudents.filter(s=>(s.accountNo||s.id||'').toLowerCase().includes(q)||(s.name||'').toLowerCase().includes(q));
+  if(schoolFilter)results=results.filter(s=>s._schoolId===schoolFilter);
+  if(!results.length){el.innerHTML='<div style="font-size:.84rem;color:var(--text3);padding:8px 0">No students found</div>';return;}
+  const dups=results.filter(s=>results.filter(r=>r.accountNo===s.accountNo&&r.accountNo).length>1);
+  el.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.85rem">
+    <thead><tr style="background:var(--bg3)"><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">Name</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">Account</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">School</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">PIN</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">Action</th> </tr></thead>
+    <tbody>${results.map(s=>`<tr style="${dups.includes(s)?'background:rgba(251,191,36,.07)':''}"><td style="padding:8px 12px;font-weight:600">${esc(s.name||'—')}</td><td style="padding:8px 12px;font-family:var(--mono);font-size:.8rem">${esc(s.accountNo||s.id)}${dups.includes(s)?' <span style="color:var(--amber);font-size:10px">DUP</span>':''}</td><td style="padding:8px 12px;font-size:.82rem">${esc(s._schoolName||'—')}</td><td style="padding:8px 12px"><span class="badge ${s.pinHash?'green':'gray'}">${s.pinHash?'Set':'Not Set'}</span></td><td style="padding:8px 12px"><button class="row-btn" onclick="confirmResetPin('${s.id}','${s._schoolId}','${esc(s.name||s.id)}','${esc(s.accountNo||s.id)}')">Reset PIN</button></td></tr>`).join('')}</tbody>
+   </table></div>`;
+}
+async function confirmResetPin(studentId,schoolId,name,accNum){
+  openModal(`<div class="modal-title">🔓 Reset Student PIN</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Reset PIN for <strong>${esc(name)}</strong> (${esc(accNum)})? The student will be required to set a new PIN on next login.</p><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="executeResetPin('${studentId}','${schoolId}','${esc(name)}','${esc(accNum)}')">Reset PIN</button></div>`);
+}
+async function executeResetPin(studentId,schoolId,name,accNum){
+  closeModal(); toast('Resetting PIN…');
+  try{
+    await db.collection('schools').doc(schoolId).collection('students').doc(studentId).update({pinHash:null,pinResetAt:firebase.firestore.FieldValue.serverTimestamp(),pinResetBy:S.user.email});
+    await db.collection('devAuditLog').add({action:'resetStudentPIN',studentId,schoolId,name,accNum,by:S.user.email,at:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('PIN reset for '+name,'success');
+  }catch(e){ toast('Error: '+e.message,'error'); }
+}
+function populateSchoolSelect(){
+  ['tool-pin-school','tool-invite-school'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel)return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All Schools</option>'+S.schools.map(s=>`<option value="${esc(s.id)}">${esc(s.name||s.id)}</option>`).join('');
+    sel.value=cur;
+  });
+}
+async function resetSchoolInvite(){
+  const schoolId=document.getElementById('tool-invite-school')?.value;
+  if(!schoolId){toast('Select a school','error');return;}
+  const newCode=Math.random().toString(36).substring(2,8).toUpperCase();
+  const el=document.getElementById('tool-invite-result');
+  try{
+    await db.collection('schools').doc(schoolId).update({inviteCode:newCode});
+    if(el){el.innerHTML=`<span style="color:var(--green)">✓ New code for ${esc(schoolId)}: <strong style="font-family:var(--mono)">${newCode}</strong></span>`;}
+    toast('Invite code reset','success'); await loadAllData();
+  }catch(e){if(el)el.textContent='Error: '+e.message; toast('Error: '+e.message,'error');}
+}
+let _healthChart=null;
+function renderHealthScores(){
+  const el=document.getElementById('health-list');
+  if(!S.loaded){el.innerHTML='<div class="empty"><div class="empty-title">Load data first</div></div>';return;}
+  const hw=document.getElementById('health-chart-wrap');
+  if(hw){
+    hw.style.display='block';
+    setTimeout(()=>{
+      if(typeof Chart==='undefined')return;
+      if(_healthChart){try{_healthChart.destroy();}catch(e){}}
+      const cv=document.getElementById('health-bar-chart'); if(!cv)return;
+      const labels=S.schools.map(sc=>sc.name||sc.id);
+      const scores=S.schools.map(sc=>{let s=100;if(!sc._teachers.some(t=>t.role==='manager'&&t.status!=='removed'))s-=30;if(sc._students.length===0)s-=40;if(!sc.lastRollover)s-=20;return s;});
+      _healthChart=new Chart(cv,{type:'bar',data:{labels,datasets:[{label:'Health Score',data:scores,backgroundColor:scores.map(s=>s>=70?'rgba(34,197,94,.75)':s>=40?'rgba(251,191,36,.75)':'rgba(248,113,113,.75)'),borderColor:scores.map(s=>s>=70?'#22C55E':s>=40?'#FBBF24':'#F87171'),borderWidth:1.5,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1F2937',titleColor:'#F9FAFB',bodyColor:'#D1D5DB',borderColor:'#4B5563',borderWidth:1}},scales:{x:{ticks:{color:'#6B7280',font:{size:9}},grid:{color:'rgba(55,65,81,.4)'}},y:{min:0,max:100,ticks:{color:'#6B7280',font:{size:9},callback:v=>v+'/100'},grid:{color:'rgba(55,65,81,.4)'}}}}});
+    },60);
+  }
+  el.innerHTML=S.schools.map(school=>{
+    const hasManager=school._teachers.some(t=>t.role==='manager'&&t.status!=='removed');
+    const studCount=school._students.length;
+    const lastRollover=school.lastRollover;
+    let score=100;
+    if(!hasManager)score-=30;
+    if(studCount===0)score-=40;
+    if(!lastRollover)score-=20;
+    const cls=score>=70?'high':score>=40?'mid':'low';
+    const label=score>=70?'Healthy':score>=40?'Needs Attention':'Critical';
+    return `<div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-weight:600;color:var(--text)">${esc(school.name||school.id)}</div>
+        <span class="health-badge ${cls}">${label} (${score}/100)</span>
+      </div>
+      <div class="health-bar-bg"><div class="health-bar-fill" style="width:${score}%;background:${cls==='high'?'var(--green)':cls==='mid'?'var(--amber)':'var(--red)'}"></div></div>
+      <div style="font-size:.78rem;color:var(--text4);margin-top:6px;font-family:var(--mono)">
+        ${!hasManager?'⚠ No active manager · ':''} ${studCount} students · ${school._txns.length} txns · ${lastRollover?'Rolled over':'No rollover yet'}
+      </div>
+    </div>`;
+  }).join('')||'<div class="empty"><div class="empty-title">No schools</div></div>';
+}
+async function findOrphans(){
+  const el=document.getElementById('orphan-results');
+  el.innerHTML='<div style="padding:16px 20px;color:var(--text3)"><span class="spinner"></span>Scanning…</div>';
+  await new Promise(r=>setTimeout(r,300));
+  const studentIds=new Set(S.allStudents.map(s=>s.id));
+  const orphanTxns=S.allTxns.filter(t=>t.studentId&&!studentIds.has(t.studentId));
+  if(!orphanTxns.length){el.innerHTML='<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No orphaned records found</div></div>';return;}
+  el.innerHTML=`<div style="padding:14px 20px;font-size:.84rem;color:var(--amber)">Found ${orphanTxns.length} transactions with no matching student:</div>
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.84rem">
+      <thead><tr style="background:var(--bg3)"><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">Student ID</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">School</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">Type</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--text4)">Amount</th> </tr></thead>
+      <tbody>${orphanTxns.slice(0,50).map(t=>`<tr><td style="padding:8px 12px;font-family:var(--mono);font-size:.8rem">${esc(t.studentId)}</td><td style="padding:8px 12px">${esc(t._schoolName||'—')}</td><td style="padding:8px 12px"><span class="badge ${t.type==='deposit'?'green':'red'}">${t.type}</span></td><td style="padding:8px 12px">${fmt(t.amount)}</td></tr>`).join('')}</tbody>
+   </table></div>`;
+}
+
+/* ── EXPORT ── */
+function dlCSV(rows,filename){ if(!rows.length)return; const h=Object.keys(rows[0]); const csv=[h.join(','),...rows.map(r=>h.map(k=>`"${(r[k]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n'); const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv'})); const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url); }
+function exportStudentsCSV(){ dlCSV(S.allStudents.map(s=>({Name:s.name||'',Account:s.accountNo||s.id,School:s._schoolName||'',Class:s.class||'',KYC:s.kycVerified?'Yes':'No',PINSet:s.pinHash?'Yes':'No'})),'students.csv'); }
+function exportTxnsCSV(){ dlCSV(S.allTxns.map(t=>({Date:fmtDate(t.createdAt),Student:t.studentName||t.studentId||'',School:t._schoolName||'',Type:t.type||'',Amount:t.amount||0,Note:t.note||''})),'transactions.csv'); }
+function exportSchoolData(schoolId){
+  const school=S.schools.find(s=>s.id===schoolId); if(!school)return;
+  if(typeof XLSX==='undefined'){toast('XLSX library not loaded','error');return;}
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(school._students.map(s=>({Name:s.name||'',Account:s.accountNo||s.id,Class:s.class||'',KYC:s.kycVerified?'Yes':'No'}))),'Students');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(school._txns.map(t=>({Date:fmtDate(t.createdAt),Student:t.studentId||'',Type:t.type||'',Amount:t.amount||0,Note:t.note||''}))),'Transactions');
+  XLSX.writeFile(wb,(school.name||school.id)+'.xlsx');
+}
+function exportAllData(){
+  if(typeof XLSX==='undefined'){toast('XLSX library not loaded','error');return;}
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.schools.map(s=>({Name:s.name||s.id,Code:s.id,Students:s._students.length,Teachers:s._teachers.filter(t=>t.status!=='removed').length}))),'Schools');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.allStudents.map(s=>({Name:s.name||'',Account:s.accountNo||s.id,School:s._schoolName||'',Class:s.class||''}))),'Students');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.allTxns.map(t=>({Date:fmtDate(t.createdAt),Student:t.studentId||'',School:t._schoolName||'',Type:t.type||'',Amount:t.amount||0}))),'Transactions');
+  XLSX.writeFile(wb,'StudentBank_Export.xlsx');
+  toast('Exported all data','success');
+}
+
+/* ── DELETED LOG ── */
+let _deletedEntries=[];
+async function loadDeletedLog(){
+  const tbody=document.getElementById('deleted-table');
+  tbody.innerHTML=`<tr><td colspan="8" class="loading-row"><span class="spinner"></span>Loading…</td></tr>`;
+  try{
+    const snap=await db.collection('devDeletedLog').orderBy('deletedAt','desc').limit(200).get();
+    _deletedEntries=snap.docs.map(d=>({id:d.id,...d.data()}));
+    updateDeletedStats(); populateDeletedSchoolFilter(); filterDeletedLog();
+  }catch(e){
+    // Try devAuditLog as fallback
+    try{
+      const snap2=await db.collection('devAuditLog').orderBy('at','desc').limit(100).get();
+      _deletedEntries=snap2.docs.filter(d=>['deleteStudent','deleteTransaction','bulk_reset'].includes(d.data().action)).map(d=>{const data=d.data();return{id:d.id,type:data.action==='deleteStudent'?'student':'transaction',schoolId:data.schoolId||'',studentName:data.name||data.studentName||'',amount:data.amount||0,deletedBy:data.by||'',reason:data.reason||'',deletedAt:data.at};});
+      updateDeletedStats(); populateDeletedSchoolFilter(); filterDeletedLog();
+      if(!_deletedEntries.length) tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">🗑</div><div class="empty-title">No deleted records found</div><div class="empty-sub">Deleted items will appear here when students or transactions are removed</div></div></td></tr>`;
+    }catch(e2){
+      tbody.innerHTML=`<tr><td colspan="8" style="padding:16px 20px"><div style="color:var(--amber);font-size:.85rem;margin-bottom:8px">⚠️ Permission issue on devDeletedLog collection.</div><div style="font-size:.82rem;color:var(--text3);line-height:1.6">To fix: Add this Firestore rule for <code style="font-family:var(--mono);color:var(--accent-l)">devDeletedLog</code>:<br><code style="font-family:var(--mono);font-size:.78rem;color:var(--green)">allow read: if request.auth != null && request.auth.uid == get(/databases/$(database)/documents/superAdmins/$(request.auth.uid)).data.role == "superAdmin";</code></div></td></tr>`;
+    }
+  }
+}
+function updateDeletedStats(){
+  const txns=_deletedEntries.filter(e=>e.type==='transaction');
+  const stus=_deletedEntries.filter(e=>e.type==='student');
+  const resets=_deletedEntries.filter(e=>e.type==='bulk_reset');
+  const total=txns.reduce((a,e)=>a+(e.amount||0),0);
+  const nb=document.getElementById('nb-deleted'); if(nb)nb.textContent=_deletedEntries.length||'—';
+  if(document.getElementById('del-txn-count')) document.getElementById('del-txn-count').textContent=txns.length;
+  if(document.getElementById('del-stu-count')) document.getElementById('del-stu-count').textContent=stus.length;
+  if(document.getElementById('del-reset-count')) document.getElementById('del-reset-count').textContent=resets.length;
+  if(document.getElementById('del-money')) document.getElementById('del-money').textContent=fmt(total);
+}
+function populateDeletedSchoolFilter(){
+  const sel=document.getElementById('del-filter-school'); if(!sel)return;
+  const schools=[...new Set(_deletedEntries.map(e=>e.schoolId).filter(Boolean))];
+  sel.innerHTML='<option value="">All Schools</option>'+schools.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+}
+function filterDeletedLog(){
+  const school=document.getElementById('del-filter-school')?.value||'';
+  const type=document.getElementById('del-filter-type')?.value||'';
+  let filtered=_deletedEntries;
+  if(school)filtered=filtered.filter(e=>e.schoolId===school);
+  if(type)filtered=filtered.filter(e=>e.type===type);
+  renderDeletedTable(filtered);
+}
+function renderDeletedTable(entries){
+  const tbody=document.getElementById('deleted-table');
+  if(!entries.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">🗑</div><div class="empty-title">No entries</div></div></td></tr>`;return;}
+  tbody.innerHTML=entries.map(e=>{
+    const when=e.deletedAt?.toDate?e.deletedAt.toDate().toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
+    const typeBadge=e.type==='transaction'?'blue':e.type==='student'?'red':e.type==='bulk_reset'?'amber':'gray';
+    return `<tr><td class="mono" style="font-size:.78rem">${when}</td><td><span class="badge ${typeBadge}">${e.type||'—'}</span></td><td style="font-size:.82rem">${esc(e.schoolId||'—')}</td><td style="font-size:.82rem">${esc(e.studentName||e.detail||'—')}</td><td style="font-weight:600;color:var(--red)">${e.amount?fmt(e.amount):'—'}</td><td style="font-size:.78rem;color:var(--text4)">${esc(e.deletedBy||'—')}</td><td style="font-size:.78rem;color:var(--text3)">${esc(e.reason||'—')}</td><td><div class="row-actions" style="opacity:1"><button class="row-btn green" onclick="confirmRestoreTxn('${e.id}','${e.schoolId||''}')">Restore</button><button class="row-btn danger" onclick="confirmPurgeEntry('${e.id}','${e.schoolId||''}')">Purge</button></div></td></tr>`;
+  }).join('');
+}
+async function confirmRestoreTxn(auditId,schoolId){
+  openModal(`<div class="modal-title" style="color:var(--green)">↩ Restore Entry</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Restore this deleted record back to the school's data?</p><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="executeRestoreTxn('${auditId}','${schoolId}')">Restore</button></div>`);
+}
+async function executeRestoreTxn(auditId,schoolId){
+  closeModal(); toast('Restoring…');
+  try{
+    const doc=await db.collection('devDeletedLog').doc(auditId).get();
+    const data=doc.data(); if(!data){toast('Entry not found','error');return;}
+    if(data.type==='transaction'&&schoolId&&data.originalData){
+      await db.collection('schools').doc(schoolId).collection('transactions').add({...data.originalData,restoredAt:firebase.firestore.FieldValue.serverTimestamp(),restoredBy:S.user.email});
+      await db.collection('devDeletedLog').doc(auditId).update({restored:true,restoredAt:firebase.firestore.FieldValue.serverTimestamp()});
+      toast('Transaction restored','success'); await loadDeletedLog();
+    } else { toast('Restore not supported for this type','error'); }
+  }catch(e){ toast('Error: '+e.message,'error'); }
+}
+async function confirmPurgeEntry(auditId,schoolId){
+  openModal(`<div class="modal-title" style="color:var(--red)">Purge Entry</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Permanently remove this entry from the audit log? This cannot be undone.</p><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger-full" onclick="executePurgeEntry('${auditId}','${schoolId}')">Purge</button></div>`);
+}
+async function executePurgeEntry(auditId){
+  closeModal(); toast('Purging…');
+  try{ await db.collection('devDeletedLog').doc(auditId).delete(); toast('Entry purged','success'); await loadDeletedLog(); }
+  catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+/* ── BACKUP ── */
+async function createBackup(){
+  const label=document.getElementById('backup-label')?.value.trim()||('Snapshot '+new Date().toLocaleDateString('en-IN'));
+  const btn=document.getElementById('backup-btn'); btn.disabled=true; btn.textContent='Creating…';
+  const prog=document.getElementById('backup-progress');
+  try{
+    const backupId='backup_'+Date.now();
+    const backupRef=db.collection('devBackups').doc(backupId);
+    await backupRef.set({label,status:'writing',createdAt:firebase.firestore.FieldValue.serverTimestamp(),by:S.user.email,schoolCount:S.schools.length,studentCount:S.allStudents.length,transactionCount:S.allTxns.length});
+    for(const school of S.schools){
+      if(prog)prog.textContent='Backing up '+esc(school.name||school.id)+'…';
+      const schoolRef=backupRef.collection('schools').doc(school.id);
+      await schoolRef.set({...school,_students:null,_teachers:null,_txns:null,name:school.name||school.id,studentCount:school._students.length,teacherCount:school._teachers.length,transactionCount:school._txns.length});
+      for(let i=0;i<school._students.length;i+=400){ const b=db.batch(); school._students.slice(i,i+400).forEach(s=>b.set(schoolRef.collection('students').doc(s.id),s)); await b.commit(); }
+      for(let i=0;i<school._teachers.length;i+=400){ const b=db.batch(); school._teachers.slice(i,i+400).forEach(t=>b.set(schoolRef.collection('teachers').doc(t.id),t)); await b.commit(); }
+      for(let i=0;i<school._txns.length;i+=400){ const b=db.batch(); school._txns.slice(i,i+400).forEach(t=>b.set(schoolRef.collection('transactions').doc(t.id),t)); await b.commit(); }
+    }
+    await backupRef.update({status:'complete'});
+    if(prog)prog.textContent='';
+    toast('Snapshot created: '+label,'success');
+    document.getElementById('backup-label').value='';
+    await loadBackupHistory();
+  }catch(e){ toast('Backup error: '+e.message,'error'); if(prog)prog.textContent='Error: '+e.message; }
+  finally{ btn.disabled=false; btn.textContent='💾 Create Snapshot'; }
+}
+async function loadBackupHistory(){
+  const el=document.getElementById('backup-history');
+  el.innerHTML='<div style="padding:16px 20px;color:var(--text3)"><span class="spinner"></span>Loading…</div>';
+  try{
+    const snap=await db.collection('devBackups').orderBy('createdAt','desc').get();
+    if(snap.empty){el.innerHTML='<div class="empty"><div class="empty-icon">💾</div><div class="empty-title">No snapshots yet</div></div>';return;}
+    el.innerHTML=snap.docs.map(d=>{
+      const b=d.data();
+      const when=b.createdAt?.toDate?b.createdAt.toDate().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+      const statusColor=b.status==='complete'?'var(--green)':b.status==='writing'?'var(--amber)':'var(--red)';
+      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
+        <div style="flex:1;min-width:0"><div style="font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:4px">${esc(b.label||'Snapshot')}</div><div style="font-size:.75rem;color:var(--text3);font-family:var(--mono)">${when} · ${b.schoolCount||0} schools · ${b.studentCount||0} students · ${b.transactionCount||0} txns</div><div style="font-size:.74rem;margin-top:3px"><span style="color:${statusColor};font-weight:600">${b.status==='complete'?'✓ Complete':b.status==='writing'?'⏳ Writing…':'⚠ Unknown'}</span></div></div>
+        <div style="display:flex;gap:8px;flex-shrink:0"><button class="btn-sm" onclick="viewBackupDetails('${d.id}')">View</button><button class="btn-sm" onclick="confirmRestoreSchool('${d.id}')">Restore School</button><button class="btn-sm danger" onclick="confirmDeleteBackup('${d.id}','${esc(b.label||'Snapshot')}')">Delete</button></div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML=`<div style="padding:16px 20px;font-size:.83rem;color:var(--red)">Error: ${esc(e.message)}</div>`; }
+}
+async function viewBackupDetails(backupId){
+  try{
+    const snap=await db.collection('devBackups').doc(backupId).collection('schools').get();
+    const rows=snap.docs.map(d=>{const s=d.data();return `<tr><td>${esc(s.name||d.id)}</td><td>${s.studentCount||0}</td><td>${s.teacherCount||0}</td><td>${s.transactionCount||0}</td></tr>`;}).join('');
+    openModal(`<div class="modal-title">💾 Snapshot Contents</div><div style="overflow-x:auto;max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:.84rem"><thead><tr style="background:var(--bg3)"><th style="padding:9px 14px;text-align:left;font-size:11px;color:var(--text3);font-weight:700">School</th><th style="padding:9px 14px;text-align:left;font-size:11px;color:var(--text3);font-weight:700">Students</th><th style="padding:9px 14px;text-align:left;font-size:11px;color:var(--text3);font-weight:700">Teachers</th><th style="padding:9px 14px;text-align:left;font-size:11px;color:var(--text3);font-weight:700">Transactions</th></tr></thead><tbody>${rows||'<tr><td colspan="4" style="padding:14px;text-align:center;color:var(--text3)">No schools</td></tr>'}</tbody></table></div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Close</button></div>`);
+  }catch(e){toast('Error: '+e.message,'error');}
+}
+async function confirmRestoreSchool(backupId){
+  try{
+    const snap=await db.collection('devBackups').doc(backupId).collection('schools').get();
+    const options=snap.docs.map(d=>`<option value="${esc(d.id)}">${esc(d.data().name||d.id)}</option>`).join('');
+    openModal(`<div class="modal-title" style="color:var(--amber)">↩ Restore School from Snapshot</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:16px;line-height:1.65">This <strong>overwrites</strong> the school's current students and transactions with snapshot data.</p><div class="modal-section"><label class="modal-label">Select School</label><select class="modal-input" id="restore-school-select"><option value="">— select —</option>${options}</select></div><div style="background:var(--red-bg);border:1px solid rgba(248,113,113,.2);border-radius:var(--r);padding:11px 13px;font-size:.8rem;color:var(--red);margin-bottom:4px">⚠ This will delete ALL current students and transactions for the selected school.</div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger-full" onclick="executeRestoreSchool('${backupId}')">↩ Restore</button></div>`);
+  }catch(e){toast('Error: '+e.message,'error');}
+}
+async function executeRestoreSchool(backupId){
+  const schoolId=document.getElementById('restore-school-select')?.value;
+  if(!schoolId){toast('Select a school','error');return;}
+  closeModal(); toast('Restoring '+schoolId+'…');
+  try{
+    const [studSnap,txnSnap,backupStudSnap,backupTxnSnap]=await Promise.all([
+      db.collection('schools').doc(schoolId).collection('students').get(),
+      db.collection('schools').doc(schoolId).collection('transactions').get(),
+      db.collection('devBackups').doc(backupId).collection('schools').doc(schoolId).collection('students').get(),
+      db.collection('devBackups').doc(backupId).collection('schools').doc(schoolId).collection('transactions').get(),
+    ]);
+    const _del=[...studSnap.docs,...txnSnap.docs];
+    for(let i=0;i<_del.length;i+=400){const b=db.batch();_del.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
+    for(let i=0;i<backupStudSnap.docs.length;i+=400){const b=db.batch();backupStudSnap.docs.slice(i,i+400).forEach(d=>b.set(db.collection('schools').doc(schoolId).collection('students').doc(d.id),d.data()));await b.commit();}
+    for(let i=0;i<backupTxnSnap.docs.length;i+=400){const b=db.batch();backupTxnSnap.docs.slice(i,i+400).forEach(d=>b.set(db.collection('schools').doc(schoolId).collection('transactions').doc(d.id),d.data()));await b.commit();}
+    await db.collection('devAuditLog').add({action:'restoreSchool',backupId,schoolId,by:S.user.email,at:firebase.firestore.FieldValue.serverTimestamp()});
+    toast(schoolId+' restored — '+backupStudSnap.size+' students, '+backupTxnSnap.size+' txns','success');
+    await loadAllData();
+  }catch(e){toast('Restore error: '+e.message,'error');}
+}
+async function confirmDeleteBackup(backupId,label){
+  openModal(`<div class="modal-title" style="color:var(--red)">Delete Snapshot</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Permanently delete snapshot "<strong>${esc(label)}</strong>"?</p><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-danger-full" onclick="executeDeleteBackup('${backupId}')">Delete Snapshot</button></div>`);
+}
+async function executeDeleteBackup(backupId){
+  closeModal(); toast('Deleting snapshot…');
+  try{
+    const schoolsSnap=await db.collection('devBackups').doc(backupId).collection('schools').get();
+    for(const schoolDoc of schoolsSnap.docs){
+      const [ss,ts,tcs]=await Promise.all([schoolDoc.ref.collection('students').get(),schoolDoc.ref.collection('transactions').get(),schoolDoc.ref.collection('teachers').get()]);
+      for(let i=0;i<ss.docs.length;i+=400){const b=db.batch();ss.docs.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
+      for(let i=0;i<ts.docs.length;i+=400){const b=db.batch();ts.docs.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
+      for(let i=0;i<tcs.docs.length;i+=400){const b=db.batch();tcs.docs.slice(i,i+400).forEach(d=>b.delete(d.ref));await b.commit();}
+      await schoolDoc.ref.delete();
+    }
+    await db.collection('devBackups').doc(backupId).delete();
+    toast('Snapshot deleted','success'); await loadBackupHistory();
+  }catch(e){toast('Error: '+e.message,'error');}
+}
+
+/* ══════════════════════════════════════════════
+   AI ASSISTANT — Groq (free, fast)
+   ══════════════════════════════════════════════ */
+const GROQ_MODEL='llama-3.3-70b-versatile';
+const GROQ_URL='https://api.groq.com/openai/v1/chat/completions';
+let _groqKey='';
+let _aiHistory=[];
+let _aiInited=false;
+let _aiTyping=false;
+
+async function loadAiKeyFromFirestore(){
+  if(!S.user)return;
+  try{
+    const doc=await db.collection('superAdmins').doc(S.user.uid).get();
+    _groqKey=doc.data()?.groqApiKey||'';
+    updateAiKeyStatus();
+  }catch(e){console.warn('AI key load:',e.message);}
+}
+
+function updateAiKeyStatus(){
+  const el=document.getElementById('ai-key-status'); if(!el)return;
+  if(_groqKey){
+    el.textContent='✓ AI Ready';
+    el.className='ai-status-pill ready';
+  } else {
+    el.textContent='⚙️ Add API Key';
+    el.className='ai-status-pill no-key';
+  }
+}
+
+function initAiView(){
+  updateAiKeyStatus();
+  if(!_aiInited){_aiInited=true;renderAiWelcome();}
+}
+
+function renderAiWelcome(){
+  const el=document.getElementById('ai-messages'); if(!el)return;
+  el.innerHTML=''; _aiHistory=[];
+  if(!_groqKey){
+    addAiBubble('assistant',
+      `👋 Welcome to the Student Bank Dev Console!\n\n` +
+      `To use the AI Assistant, you need to add a **free Groq API key**.\n\n` +
+      `1. Go to [console.groq.com/keys](https://console.groq.com/keys) and sign up with Google.\n` +
+      `2. Copy your key (starts with \`gsk_\`).\n` +
+      `3. Click the **⚙️ Settings** button in the top bar and paste your key.\n\n` +
+      `Once saved, the AI will be ready to help you manage all schools, students, and transactions.`
+    );
+  } else {
+    addAiBubble('assistant',
+      `👋 Hi! I'm your AI Assistant, powered by **Groq**.\n\n` +
+      `I have live access to all platform data and can perform real actions.\n\n` +
+      `Try the quick buttons above, or ask anything in plain English!`
+    );
+  }
+}
+
+function clearAiChat(){ _aiHistory=[]; if(_aiInited)renderAiWelcome(); }
+function aiQuick(text){
+  const inp=document.getElementById('ai-input');
+  if(inp){
+    inp.value=text;
+    inp.focus();
+  }
+  sendAiMsg();
+}
+
+function addAiBubble(role,text){
+  const msgs=document.getElementById('ai-messages'); if(!msgs)return;
+  const isUser=role==='user';
+  const div=document.createElement('div');
+  div.className='ai-msg'+(isUser?' user':'');
+  const clean=text.replace(/<ACTION>[\s\S]*?<\/ACTION>/g,'').trim();
+  div.innerHTML=`<div class="ai-avatar">${isUser?'👤':'✨'}</div><div class="ai-bubble">${formatAiText(clean)}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function formatAiText(raw){
+  const esc2=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const parts=[]; const re=/```(\w*)\n?([\s\S]*?)```/g; let last=0,m;
+  while((m=re.exec(raw))!==null){ if(m.index>last)parts.push({t:'text',v:raw.slice(last,m.index)}); parts.push({t:'code',v:m[2]}); last=m.index+m[0].length; }
+  parts.push({t:'text',v:raw.slice(last)});
+  return parts.map(p=>{
+    if(p.t==='code')return`<pre>${esc2(p.v.trim())}</pre>`;
+    return esc2(p.v).replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/\*([^*\n]+)\*/g,'<em>$1</em>').replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/^- (.+)$/gm,'<span style="display:flex;gap:6px;margin:2px 0"><span style="color:var(--accent-l);flex-shrink:0">›</span><span>$1</span></span>').replace(/\n/g,'<br>');
+  }).join('');
+}
+
+function showAiTyping(){
+  const msgs=document.getElementById('ai-messages'); if(!msgs)return;
+  const d=document.createElement('div'); d.className='ai-msg'; d.id='ai-typing-indicator';
+  d.innerHTML=`<div class="ai-avatar">✨</div><div class="ai-bubble"><div class="ai-typing"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
+}
+function hideAiTyping(){ const el=document.getElementById('ai-typing-indicator'); if(el)el.remove(); }
+
+async function sendAiMsg(){
+  if(_aiTyping)return;
+  if(!_groqKey){ toast('Add your free Groq API key in ⚙️ Settings','error'); showSettingsModal(); return; }
+  const inp=document.getElementById('ai-input');
+  const text=(inp?.value||'').trim(); if(!text)return;
+  inp.value='';
+  addAiBubble('user',text);
+  _aiHistory.push({role:'user',content:text});
+  _aiTyping=true;
+  const btn=document.getElementById('ai-send-btn'); if(btn){btn.disabled=true;btn.textContent='…';}
+  showAiTyping();
+  try{
+    const res=await fetch(GROQ_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_groqKey},
+      body:JSON.stringify({model:GROQ_MODEL,messages:[{role:'system',content:buildSystemPrompt()},..._aiHistory],max_tokens:1800,temperature:0.55})
+    });
+    const data=await res.json();
+    if(!res.ok){
+      const msg=data?.error?.message||'API error '+res.status;
+      hideAiTyping(); addAiBubble('assistant','⚠️ **Error:** '+msg);
+      if(res.status===401)toast('Invalid Groq key — update in ⚙️ Settings','error');
+      else toast('Groq error: '+msg,'error');
+      _aiHistory.pop();
+    } else {
+      const reply=data?.choices?.[0]?.message?.content||'(no response)';
+      hideAiTyping();
+      addAiBubble('assistant',reply);
+      _aiHistory.push({role:'assistant',content:reply});
+      await executeAiActions(reply);
+    }
+  }catch(e){
+    hideAiTyping(); addAiBubble('assistant','⚠️ Network error: '+e.message);
+    toast('AI request failed','error'); _aiHistory.pop();
+  }finally{
+    _aiTyping=false;
+    if(btn){btn.disabled=false;btn.textContent='Send';}
+    const msgs=document.getElementById('ai-messages'); if(msgs)msgs.scrollTop=msgs.scrollHeight;
+  }
+}
+
+function buildSystemPrompt(){
+  let ctx='Platform data not loaded yet — user needs to visit Dashboard first to load data.';
+  if(S.loaded){
+    const totalSav=S.allStudents.reduce((acc,s)=>{
+      const d=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+      const w=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+      return acc+(parseFloat(s.openingBalance)||0)+d-w;
+    },0);
+    const schoolLines=S.schools.map(sc=>{
+      const bal=sc._students.reduce((acc,s)=>{
+        const d=sc._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+        const w=sc._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+        return acc+(parseFloat(s.openingBalance)||0)+d-w;
+      },0);
+      return `  • School ID="${sc.id}" Name="${sc.name||sc.id}": ${sc._students.length} students, ${sc._teachers.filter(t=>t.status!=='removed').length} teachers, savings ₹${Math.round(bal).toLocaleString('en-IN')}`;
+    }).join('\n');
+    const top5=([...S.allStudents].map(s=>{
+      const d=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+      const w=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+      return {...s,_bal:(parseFloat(s.openingBalance)||0)+d-w};
+    }).sort((a,b)=>b._bal-a._bal).slice(0,5).map(s=>`  ${s.name||'?'} (${s.accountNo||s.id}) ₹${Math.round(s._bal).toLocaleString('en-IN')} — ${s._schoolName}`).join('\n'));
+    const recentTxns=[...S.allTxns].sort((a,b)=>(b.createdAt?.toMillis?.()??0)-(a.createdAt?.toMillis?.()??0)).slice(0,8).map(t=>`  ${t.type==='deposit'?'+':'-'}₹${t.amount} ${t._schoolName} ${t.studentId}`).join('\n');
+    ctx=`LIVE PLATFORM DATA (${new Date().toLocaleString('en-IN')}):
+Total: ${S.schools.length} schools | ${S.allStudents.length} students | ${S.allTeachers.filter(t=>t.status!=='removed').length} teachers | ${S.allTxns.length} transactions
+Platform savings: ₹${Math.round(totalSav).toLocaleString('en-IN')}
+Deposits: ${S.allTxns.filter(t=>t.type==='deposit').length} | Withdrawals: ${S.allTxns.filter(t=>t.type==='withdrawal').length}
+
+Schools:\n${schoolLines||'  none'}
+Top 5 by balance:\n${top5||'  none'}
+Recent transactions:\n${recentTxns||'  none'}`;
+  }
+
+  return `You are the AI soul of the Student Bank dev console — a powerful school savings bank platform for rural Maharashtra, India built on Firebase/Firestore. You help the super-admin manage everything.
+
+You have FULL LIVE ACCESS to platform data and can PERFORM REAL ACTIONS by including action tags in your response:
+
+ACTIONS — use these exact JSON formats, embed anywhere in response:
+<ACTION>{"type":"SEARCH_STUDENT","query":"student name or account number"}</ACTION>
+<ACTION>{"type":"SHOW_TOP_STUDENTS","limit":10}</ACTION>
+<ACTION>{"type":"SHOW_ZERO_BALANCE"}</ACTION>
+<ACTION>{"type":"SHOW_TRANSACTIONS","limit":15}</ACTION>
+<ACTION>{"type":"SHOW_PLATFORM_CHART"}</ACTION>
+<ACTION>{"type":"SHOW_SCHOOL_CHART","schoolId":"EXACT_SCHOOL_ID_FROM_DATA"}</ACTION>
+<ACTION>{"type":"SHOW_HEALTH_REPORT"}</ACTION>
+<ACTION>{"type":"SEND_BROADCAST","title":"title here","body":"message here","msgType":"info"}</ACTION>
+<ACTION>{"type":"EXPORT_PDF","subject":"students"}</ACTION>
+<ACTION>{"type":"EXPORT_EXCEL","subject":"students"}</ACTION>
+<ACTION>{"type":"RESET_STUDENT_PIN","studentQuery":"student name"}</ACTION>
+
+CRITICAL RULES — follow exactly:
+1. SHOW_PLATFORM_CHART = charts for ALL schools (no schoolId field — never add schoolId to this)
+2. SHOW_SCHOOL_CHART requires schoolId = the exact ID from the school list above (e.g. "ZP", "ZPHS_Omerga") — look it up in the data
+3. For "show charts", "visual", "statistics" with NO specific school → use SHOW_PLATFORM_CHART
+4. For a SPECIFIC school's stats → SHOW_SCHOOL_CHART with that school's exact ID
+5. NEVER pass "all" or "platform" as a schoolId — that is WRONG
+6. Keep text SHORT — actions show the data visually
+7. Use ₹ symbol, Indian number formatting (1,00,000 style)
+8. Always perform the action AND give a one-line summary
+
+${ctx}`;
+}
+
+/* ── Action execution ── */
+async function executeAiActions(text){
+  const re=/<ACTION>([\s\S]*?)<\/ACTION>/g;
+  let m;
+  while((m=re.exec(text))!==null){
+    try{ await runAction(JSON.parse(m[1])); }
+    catch(e){ addActionCard('⚠️ Action error: '+e.message,'error-card'); }
+  }
+}
+
+/* ── Chart renderer (Chart.js inline in chat) ── */
+let _chartN=0;
+function renderAiChart(cfg, title){
+  _chartN++;
+  const id='aic'+_chartN;
+  const wrap=document.createElement('div');
+  wrap.className='ai-action-card table-card-ai';
+  wrap.innerHTML='<div style="padding:12px 14px;font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">'+title+'</div><div style="padding:14px 16px;position:relative;height:260px"><canvas id="'+id+'"></canvas></div>';
+  const msgs=document.getElementById('ai-messages'); if(!msgs)return;
+  msgs.appendChild(wrap); msgs.scrollTop=msgs.scrollHeight;
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      const el=document.getElementById(id);
+      if(!el||typeof Chart==='undefined'){console.warn('Chart.js not ready');return;}
+      const isPie=cfg.type==='pie'||cfg.type==='doughnut';
+      if(!cfg.options) cfg.options={};
+      cfg.options.responsive=true;
+      cfg.options.maintainAspectRatio=false;
+      if(!cfg.options.plugins) cfg.options.plugins={};
+      cfg.options.plugins.legend=cfg.options.plugins.legend||{labels:{color:'#9CA3AF',font:{size:11}}};
+      cfg.options.plugins.tooltip={backgroundColor:'#1F2937',titleColor:'#F9FAFB',bodyColor:'#D1D5DB',borderColor:'#4B5563',borderWidth:1};
+      if(!isPie){
+        cfg.options.scales={
+          x:{ticks:{color:'#6B7280',font:{size:10}},grid:{color:'rgba(55,65,81,.4)'}},
+          y:{ticks:{color:'#6B7280',font:{size:10}},grid:{color:'rgba(55,65,81,.4)'}}
+        };
+      }
+      try{ new Chart(el,cfg); }catch(err){console.error('Chart render error:',err);}
+    });
+  });
+}
+
+/* ── PDF export ── */
+function exportAiPDF(subject, schoolId){
+  if(typeof jspdf==='undefined'&&typeof window.jspdf==='undefined'){toast('PDF library loading…','error');return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const now=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  doc.setFillColor(17,24,39); doc.rect(0,0,297,210,'F');
+  doc.setTextColor(249,250,251); doc.setFontSize(16); doc.setFont('helvetica','bold');
+
+  if(subject==='students'||subject==='school_detail'){
+    let students=S.allStudents;
+    let title='All Students Report';
+    if(schoolId){ const sc=S.schools.find(s=>s.id===schoolId||s.name===schoolId); if(sc){students=sc._students;title=`${sc.name||sc.id} — Students`;} }
+    doc.text(title,14,16);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(156,163,175);
+    doc.text(`Generated: ${now} | Student Bank Dev Console`,14,22);
+    const rows=students.map(s=>{
+      const d=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+      const w=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+      const bal=(parseFloat(s.openingBalance)||0)+d-w;
+      return [s.name||'—',s.accountNo||s.id,s._schoolName||'—',s.class||'—',`Rs.${Math.round(bal).toLocaleString('en-IN')}`,s.kycVerified?'Yes':'No',S.allTxns.filter(t=>t.studentId===s.id).length];
+    });
+    doc.autoTable({startY:27,head:[['Name','Account','School','Class','Balance','KYC','Txns']],body:rows,styles:{fontSize:8,cellPadding:3,fillColor:[31,41,55],textColor:[209,213,219],lineColor:[55,65,81]},headStyles:{fillColor:[59,130,246],textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[40,53,72]},margin:{left:14,right:14}});
+  } else if(subject==='transactions'){
+    doc.text('Transaction Report',14,16);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(156,163,175);
+    doc.text(`Generated: ${now} | ${S.allTxns.length} total transactions`,14,22);
+    const txns=[...S.allTxns].sort((a,b)=>(b.createdAt?.toMillis?.()??0)-(a.createdAt?.toMillis?.()??0)).slice(0,200);
+    const rows=txns.map(t=>[fmtDate(t.createdAt),t.studentName||t.studentId||'—',t._schoolName||'—',t.type||'—',`Rs.${(t.amount||0).toLocaleString('en-IN')}`,t.note||'—']);
+    doc.autoTable({startY:27,head:[['Date','Student','School','Type','Amount','Note']],body:rows,styles:{fontSize:7.5,cellPadding:2.5,fillColor:[31,41,55],textColor:[209,213,219],lineColor:[55,65,81]},headStyles:{fillColor:[59,130,246],textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[40,53,72]},margin:{left:14,right:14}});
+  } else {
+    doc.text('Schools Report',14,16);
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(156,163,175);
+    doc.text(`Generated: ${now} | ${S.schools.length} schools`,14,22);
+    const rows=S.schools.map(sc=>{
+      const bal=sc._students.reduce((acc,s)=>{ const d=sc._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0); const w=sc._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0); return acc+(parseFloat(s.openingBalance)||0)+d-w; },0);
+      return [sc.name||sc.id,sc.id,sc._students.length,sc._teachers.filter(t=>t.status!=='removed').length,sc._txns.length,`Rs.${Math.round(bal).toLocaleString('en-IN')}`,fmtDate(sc.lastRollover)];
+    });
+    doc.autoTable({startY:27,head:[['School Name','Code','Students','Teachers','Transactions','Total Savings','Last Rollover']],body:rows,styles:{fontSize:8,cellPadding:3,fillColor:[31,41,55],textColor:[209,213,219],lineColor:[55,65,81]},headStyles:{fillColor:[59,130,246],textColor:[255,255,255],fontStyle:'bold'},alternateRowStyles:{fillColor:[40,53,72]},margin:{left:14,right:14}});
+  }
+  doc.save(`StudentBank_${subject}_${Date.now()}.pdf`);
+  addActionCard(`✅ <strong>PDF exported</strong> — check your Downloads folder.`,'success');
+}
+
+async function runAction(act){
+  switch(act.type){
+
+    case 'SEARCH_STUDENT':{
+      const q=(act.query||'').toLowerCase();
+      const found=S.allStudents.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.accountNo||'').toLowerCase().includes(q)||(s.id||'').toLowerCase().includes(q)).slice(0,15);
+      if(!found.length){addActionCard(`🔍 No students found matching "<strong>${esc(act.query)}</strong>"`, 'info');break;}
+      const rows=found.map(s=>{
+        const d=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+        const w=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+        const bal=(parseFloat(s.openingBalance)||0)+d-w;
+        const txns=S.allTxns.filter(t=>t.studentId===s.id).length;
+        return `<tr><td>${esc(s.name||'—')}</td><td><code style="font-family:var(--mono);font-size:.78rem;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--accent-l)">${esc(s.accountNo||s.id)}</code></td><td>${esc(s._schoolName||'—')}</td><td>${esc(s.class||'—')}</td><td style="color:var(--green);font-weight:600">₹${Math.round(bal).toLocaleString('en-IN')}</td><td>${txns}</td><td><span class="badge ${s.pinHash?'green':'gray'}" style="font-size:10px">${s.pinHash?'Set':'—'}</span></td></tr>`;
+      }).join('');
+      addActionCard(`<div style="padding:10px 14px;font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">🔍 ${found.length} result(s) for "${esc(act.query)}"</div><div style="overflow-x:auto"><table class="ai-action-table"><thead><tr><th>Name</th><th>Account</th><th>School</th><th>Class</th><th>Balance</th><th>Txns</th><th>PIN</th></tr></thead><tbody>${rows}</tbody></table></div>`,'table-card-ai');
+      break;
+    }
+
+    case 'SHOW_TOP_STUDENTS':
+    case 'SHOW_BALANCE_REPORT':{
+      if(!S.loaded||!S.allStudents.length){addActionCard('⚠️ No student data loaded.','error-card');break;}
+      const limit=Math.min(act.limit||10,50);
+      const ranked=[...S.allStudents].map(s=>{
+        const d=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+        const w=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+        return {...s,_bal:(parseFloat(s.openingBalance)||0)+d-w};
+      }).sort((a,b)=>b._bal-a._bal).slice(0,limit);
+      const rows=ranked.map((s,i)=>`<tr><td style="color:var(--text4);font-family:var(--mono);font-size:.78rem">#${i+1}</td><td>${esc(s.name||'—')}</td><td><code style="font-family:var(--mono);font-size:.78rem;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--accent-l)">${esc(s.accountNo||s.id)}</code></td><td>${esc(s._schoolName||'—')}</td><td style="color:var(--green);font-weight:700">₹${Math.round(s._bal).toLocaleString('en-IN')}</td></tr>`).join('');
+      addActionCard(`<div style="padding:10px 14px;font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">💰 Top ${limit} Students by Balance</div><div style="overflow-x:auto"><table class="ai-action-table"><thead><tr><th>#</th><th>Name</th><th>Account</th><th>School</th><th>Balance</th></tr></thead><tbody>${rows}</tbody></table></div>`,'table-card-ai');
+      break;
+    }
+
+    case 'SHOW_ZERO_BALANCE':{
+      const zeros=[...S.allStudents].map(s=>{
+        const d=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+        const w=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+        return {...s,_bal:(parseFloat(s.openingBalance)||0)+d-w};
+      }).filter(s=>s._bal<=0);
+      if(!zeros.length){addActionCard('✅ No students with zero or negative balance!','success');break;}
+      const rows=zeros.map(s=>`<tr><td>${esc(s.name||'—')}</td><td><code style="font-family:var(--mono);font-size:.78rem;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--accent-l)">${esc(s.accountNo||s.id)}</code></td><td>${esc(s._schoolName||'—')}</td><td style="color:var(--red);font-weight:700">₹${Math.round(s._bal).toLocaleString('en-IN')}</td></tr>`).join('');
+      addActionCard(`<div style="padding:10px 14px;font-size:.8rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">⚠️ ${zeros.length} Students with Zero/Negative Balance</div><div style="overflow-x:auto"><table class="ai-action-table"><thead><tr><th>Name</th><th>Account</th><th>School</th><th>Balance</th></tr></thead><tbody>${rows}</tbody></table></div>`,'table-card-ai');
+      break;
+    }
+
+    case 'SHOW_TRANSACTIONS':{
+      const limit=Math.min(act.limit||15,100);
+      let txns=[...S.allTxns];
+      if(act.schoolId)txns=txns.filter(t=>t._schoolId===act.schoolId);
+      txns.sort((a,b)=>(b.createdAt?.toMillis?.()??0)-(a.createdAt?.toMillis?.()??0));
+      const slice=txns.slice(0,limit);
+      const rows=slice.map(t=>`<tr><td style="font-family:var(--mono);font-size:.76rem;color:var(--text4)">${fmtDate(t.createdAt)}</td><td>${esc(t.studentName||t.studentId||'—')}</td><td>${esc(t._schoolName||'—')}</td><td><span class="badge ${t.type==='deposit'?'green':'red'}" style="font-size:11px">${t.type||'—'}</span></td><td style="font-weight:600;color:${t.type==='deposit'?'var(--green)':'var(--red)'}">₹${(t.amount||0).toLocaleString('en-IN')}</td><td style="color:var(--text4);font-size:.78rem">${esc(t.note||'—')}</td></tr>`).join('');
+      addActionCard(`<div style="padding:10px 14px;font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">📋 Last ${slice.length} Transactions${act.schoolId?' — '+esc(act.schoolId):''}</div><div style="overflow-x:auto"><table class="ai-action-table"><thead><tr><th>Date</th><th>Student</th><th>School</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></div>`,'table-card-ai');
+      break;
+    }
+
+    case 'SHOW_SCHOOL_DETAIL':{
+      const school=S.schools.find(s=>s.id===act.schoolId||s.name===act.schoolId);
+      if(!school){
+        const _av2=S.schools.map(sc=>sc.name||sc.id).join(', ');
+        addActionCard('⚠️ School "'+esc(act.schoolId)+'" not found. Available: '+esc(_av2)+'. Showing platform chart instead.','info');
+        await runAction({type:'SHOW_PLATFORM_CHART'}); break;
+      }
+      const deps=school._txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+      const wds=school._txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+      addActionCard(`<div style="padding:14px 16px">
+        <div style="font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:4px">${esc(school.name||school.id)}</div>
+        <div style="font-size:.78rem;color:var(--text4);font-family:var(--mono);margin-bottom:12px">${school.id}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">
+          <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px"><div style="font-size:10px;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Students</div><div style="font-size:1.2rem;font-weight:700;color:var(--accent-l)">${school._students.length}</div></div>
+          <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px"><div style="font-size:10px;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Teachers</div><div style="font-size:1.2rem;font-weight:700;color:var(--purple)">${school._teachers.filter(t=>t.status!=='removed').length}</div></div>
+          <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px"><div style="font-size:10px;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Deposits</div><div style="font-size:1.1rem;font-weight:700;color:var(--green)">₹${Math.round(deps).toLocaleString('en-IN')}</div></div>
+          <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px"><div style="font-size:10px;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Withdrawals</div><div style="font-size:1.1rem;font-weight:700;color:var(--red)">₹${Math.round(wds).toLocaleString('en-IN')}</div></div>
+        </div>
+      </div>`,'table-card-ai');
+      break;
+    }
+
+    case 'SEND_BROADCAST':{
+      const t=act.title||'', b=act.body||act.message||'', mt=act.msgType||'info';
+      window._pendingAiBroadcast={title:t,body:b,msgType:mt};
+      openModal(`
+        <div class="modal-title" style="color:var(--amber)">📣 Confirm Broadcast</div>
+        <p style="font-size:.86rem;color:var(--text2);margin-bottom:14px;line-height:1.65">Send to all <strong>${S.schools.length} schools</strong>?</p>
+        <div style="background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:16px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span class="badge ${mt==='urgent'?'red':mt==='warning'?'amber':'blue'}">${mt}</span>
+            <span style="font-weight:700;color:var(--text)">${esc(t)}</span>
+          </div>
+          ${b?`<div style="font-size:.85rem;color:var(--text2);line-height:1.6">${esc(b)}</div>`:''}
+        </div>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+          <button class="btn-primary" onclick="closeModal();confirmPendingBroadcast()">📣 Send to All Schools</button>
+        </div>
+      `);
+      addActionCard('📣 Broadcast preview — confirm in dialog to send to <strong>'+S.schools.length+' schools</strong>.','info');
+      break;
+    }
+    case 'NAVIGATE':{
+      const safe=['overview','schools','transactions','tools','backup','broadcast','search','deleted','teachers'];
+      if(safe.includes(act.view)){
+        switchView(act.view);
+        addActionCard(`🧭 Navigated to <strong>${act.view}</strong>.`,'info');
+      }
+      break;
+    }
+
+    case 'SHOW_PLATFORM_CHART':{
+      const chartType=act.chartType||'bar';
+      if(!S.loaded||!S.schools.length){addActionCard('⚠️ No school data loaded yet. Visit Dashboard first.','error-card');break;}
+      const labels=S.schools.map(sc=>sc.name||sc.id);
+      const stuCounts=S.schools.map(sc=>sc._students.length);
+      const balances=S.schools.map(sc=>Math.round(sc._students.reduce((acc,s)=>{ const d=sc._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0); const w=sc._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0); return acc+(parseFloat(s.openingBalance)||0)+d-w; },0)));
+      const colors=['#3B82F6','#22C55E','#C084FC','#FBBF24','#F87171','#60A5FA','#34D399','#A78BFA','#FCD34D','#F97316'];
+      if(chartType==='pie'||chartType==='doughnut'){
+        renderAiChart({type:'doughnut',data:{labels,datasets:[{data:stuCounts,backgroundColor:colors.slice(0,labels.length),borderColor:'#111827',borderWidth:2}]},options:{plugins:{legend:{position:'right'}}}}, '🏫 Students per School');
+        renderAiChart({type:'doughnut',data:{labels,datasets:[{data:balances,backgroundColor:colors.slice(0,labels.length),borderColor:'#111827',borderWidth:2}]},options:{plugins:{legend:{position:'right'}}}}, '💰 Savings Distribution');
+      } else {
+        renderAiChart({type:'bar',data:{labels,datasets:[{label:'Students',data:stuCounts,backgroundColor:'rgba(59,130,246,.75)',borderColor:'#3B82F6',borderWidth:1.5,borderRadius:4},{label:'Transactions',data:S.schools.map(sc=>sc._txns.length),backgroundColor:'rgba(192,132,252,.6)',borderColor:'#C084FC',borderWidth:1.5,borderRadius:4}]}}, '🏫 Schools — Students & Transactions');
+        renderAiChart({type:'bar',data:{labels,datasets:[{label:'Total Savings (₹)',data:balances,backgroundColor:'rgba(34,197,94,.7)',borderColor:'#22C55E',borderWidth:1.5,borderRadius:4}]},options:{scales:{y:{ticks:{callback:v=>'₹'+Number(v).toLocaleString('en-IN')}}}}}, '💰 Total Savings by School');
+      }
+      break;
+    }
+
+    case 'SHOW_SCHOOL_CHART':{
+      const _sid=(act.schoolId||'').toLowerCase().trim();
+      if(!_sid||_sid==='all'||_sid==='platform'||_sid==='every'||_sid==='schools'||_sid==='optional'){
+        await runAction({type:'SHOW_PLATFORM_CHART'}); break;
+      }
+      const school=S.schools.find(s=>s.id===act.schoolId||s.name===act.schoolId||(s.name||'').toLowerCase().includes(_sid)||(s.id||'').toLowerCase().includes(_sid));
+      if(!school){addActionCard('⚠️ School not found: '+esc(act.schoolId),'error-card');break;}
+      // Balance distribution pie
+      const stuLabels=school._students.slice(0,12).map(s=>s.name||s.accountNo||s.id);
+      const stuBals=school._students.slice(0,12).map(s=>{ const d=school._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0); const w=school._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0); return Math.max(0,Math.round((parseFloat(s.openingBalance)||0)+d-w)); });
+      const cols=['#3B82F6','#22C55E','#C084FC','#FBBF24','#F87171','#60A5FA','#34D399','#A78BFA','#FCD34D','#F97316','#EC4899','#14B8A6'];
+      renderAiChart({type:'doughnut',data:{labels:stuLabels,datasets:[{data:stuBals,backgroundColor:cols.slice(0,stuLabels.length),borderColor:'#111827',borderWidth:2}]},options:{plugins:{legend:{position:'right',labels:{font:{size:10}}}}}}, `🏫 ${esc(school.name||school.id)} — Balance Distribution`);
+      // Deposits vs withdrawals bar per student
+      const depArr=school._students.slice(0,10).map(s=>Math.round(school._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0)));
+      const wdArr=school._students.slice(0,10).map(s=>Math.round(school._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0)));
+      renderAiChart({type:'bar',data:{labels:school._students.slice(0,10).map(s=>s.name||s.accountNo||s.id),datasets:[{label:'Deposits',data:depArr,backgroundColor:'rgba(34,197,94,.75)',borderColor:'#22C55E',borderWidth:1.5,borderRadius:4},{label:'Withdrawals',data:wdArr,backgroundColor:'rgba(248,113,113,.7)',borderColor:'#F87171',borderWidth:1.5,borderRadius:4}]},options:{scales:{y:{ticks:{callback:v=>'₹'+Number(v).toLocaleString('en-IN')}}}}}, `💳 ${esc(school.name||school.id)} — Deposits vs Withdrawals`);
+      // Stats card
+      const totalDep=school._txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);
+      const totalWd=school._txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);
+      addActionCard(
+        '<div style="padding:14px 16px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
+        '<div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;text-align:center"><div style="font-size:10px;color:var(--text4);text-transform:uppercase;margin-bottom:4px">Students</div><div style="font-size:1.4rem;font-weight:700;color:var(--accent-l)">'+school._students.length+'</div></div>' +
+        '<div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;text-align:center"><div style="font-size:10px;color:var(--text4);text-transform:uppercase;margin-bottom:4px">Transactions</div><div style="font-size:1.4rem;font-weight:700;color:var(--text)">'+school._txns.length+'</div></div>' +
+        '<div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;text-align:center"><div style="font-size:10px;color:var(--text4);text-transform:uppercase;margin-bottom:4px">Net Savings</div><div style="font-size:1.1rem;font-weight:700;color:var(--green)">₹'+Math.round(totalDep-totalWd).toLocaleString('en-IN')+'</div></div>' +
+        '</div>',
+        'table-card-ai'
+      );
+      break;
+    }
+
+    case 'SHOW_TRANSACTION_CHART':{
+      let txns=S.allTxns;
+      let label='All Schools';
+      if(act.schoolId){ const sc=S.schools.find(s=>s.id===act.schoolId||s.name===act.schoolId); if(sc){txns=sc._txns;label=sc.name||sc.id;} }
+      // Deposits vs withdrawals totals
+      const depTotal=Math.round(txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0));
+      const wdTotal=Math.round(txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0));
+      renderAiChart({type:'doughnut',data:{labels:['Deposits','Withdrawals'],datasets:[{data:[depTotal,wdTotal],backgroundColor:['rgba(34,197,94,.8)','rgba(248,113,113,.8)'],borderColor:'#111827',borderWidth:2}]},options:{plugins:{legend:{position:'bottom'}}}}, `💳 ${label} — Deposits vs Withdrawals`);
+      // Per-school breakdown if all schools
+      if(!act.schoolId && S.schools.length>1){
+        const scLabels=S.schools.map(sc=>sc.name||sc.id);
+        const scDeps=S.schools.map(sc=>Math.round(sc._txns.filter(t=>t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0)));
+        const scWds=S.schools.map(sc=>Math.round(sc._txns.filter(t=>t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0)));
+        renderAiChart({type:'bar',data:{labels:scLabels,datasets:[{label:'Deposits',data:scDeps,backgroundColor:'rgba(34,197,94,.7)',borderColor:'#22C55E',borderWidth:1.5,borderRadius:4},{label:'Withdrawals',data:scWds,backgroundColor:'rgba(248,113,113,.7)',borderColor:'#F87171',borderWidth:1.5,borderRadius:4}]},options:{scales:{y:{ticks:{callback:v=>'₹'+Number(v).toLocaleString('en-IN')}}}}}, '💳 Deposits vs Withdrawals by School');
+      }
+      break;
+    }
+
+    case 'SHOW_HEALTH_REPORT':{
+      const labels=S.schools.map(sc=>sc.name||sc.id);
+      const scores=S.schools.map(sc=>{ let s=100; if(!sc._teachers.some(t=>t.role==='manager'&&t.status!=='removed'))s-=30; if(sc._students.length===0)s-=40; if(!sc.lastRollover)s-=20; return s; });
+      renderAiChart({type:'bar',data:{labels,datasets:[{label:'Health Score',data:scores,backgroundColor:scores.map(s=>s>=70?'rgba(34,197,94,.75)':s>=40?'rgba(251,191,36,.75)':'rgba(248,113,113,.75)'),borderColor:scores.map(s=>s>=70?'#22C55E':s>=40?'#FBBF24':'#F87171'),borderWidth:1.5,borderRadius:6}]},options:{scales:{y:{min:0,max:100,ticks:{callback:v=>v+'/100'}}}}}, '💡 Platform Health Scores');
+      const rows=S.schools.map(sc=>{ const hasM=sc._teachers.some(t=>t.role==='manager'&&t.status!=='removed'); let s=100; if(!hasM)s-=30; if(sc._students.length===0)s-=40; if(!sc.lastRollover)s-=20; const cls=s>=70?'green':s>=40?'amber':'red'; return `<tr><td>${esc(sc.name||sc.id)}</td><td><span class="badge ${cls}" style="font-size:11px">${s}/100 ${s>=70?'Healthy':s>=40?'Needs Attention':'Critical'}</span></td><td>${sc._students.length}</td><td>${hasM?'✓':'⚠ None'}</td><td>${sc.lastRollover?fmtDate(sc.lastRollover):'Never'}</td></tr>`; }).join('');
+      addActionCard(`<div style="padding:10px 14px;font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">💡 Health Summary</div><div style="overflow-x:auto"><table class="ai-action-table"><thead><tr><th>School</th><th>Score</th><th>Students</th><th>Manager</th><th>Last Rollover</th></tr></thead><tbody>${rows}</tbody></table></div>`,'table-card-ai');
+      break;
+    }
+
+    case 'EXPORT_PDF':{
+      addActionCard('⏳ Generating PDF…','info');
+      setTimeout(()=>exportAiPDF(act.subject||'students', act.schoolId||null),100);
+      break;
+    }
+
+    case 'EXPORT_EXCEL':{
+      const subj=act.subject||'students';
+      if(typeof XLSX==='undefined'){addActionCard('⚠️ Excel library not loaded','error-card');break;}
+      const wb=XLSX.utils.book_new();
+      if(subj==='students'){ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.allStudents.map(s=>{const d=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);const w=S.allTxns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);return{Name:s.name||'',Account:s.accountNo||s.id,School:s._schoolName||'',Class:s.class||'',Balance:Math.round((parseFloat(s.openingBalance)||0)+d-w),KYC:s.kycVerified?'Yes':'No',Transactions:S.allTxns.filter(t=>t.studentId===s.id).length};})),'Students'); XLSX.writeFile(wb,'Students.xlsx'); }
+      else if(subj==='transactions'){ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.allTxns.map(t=>({Date:fmtDate(t.createdAt),Student:t.studentName||t.studentId||'',School:t._schoolName||'',Type:t.type||'',Amount:t.amount||0,Note:t.note||''}))),'Transactions'); XLSX.writeFile(wb,'Transactions.xlsx'); }
+      else { XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(S.schools.map(sc=>{const b=sc._students.reduce((acc,s)=>{const d=sc._txns.filter(t=>t.studentId===s.id&&t.type==='deposit').reduce((a,t)=>a+(t.amount||0),0);const w=sc._txns.filter(t=>t.studentId===s.id&&t.type==='withdrawal').reduce((a,t)=>a+(t.amount||0),0);return acc+(parseFloat(s.openingBalance)||0)+d-w;},0);return{Name:sc.name||sc.id,Code:sc.id,Students:sc._students.length,Teachers:sc._teachers.filter(t=>t.status!=='removed').length,Transactions:sc._txns.length,TotalSavings:Math.round(b)};})),'Schools'); XLSX.writeFile(wb,'Schools.xlsx'); }
+      addActionCard(`✅ <strong>Excel exported</strong> — check your Downloads folder.`,'success');
+      break;
+    }
+
+    case 'RESET_STUDENT_PIN':{
+      const q=(act.studentQuery||'').toLowerCase();
+      if(!q){addActionCard('⚠️ Provide a student name or account to reset PIN','error-card');break;}
+      const found=S.allStudents.filter(s=>(s.name||'').toLowerCase().includes(q)||(s.accountNo||'').toLowerCase().includes(q)||(s.id||'').toLowerCase().includes(q)).slice(0,5);
+      if(!found.length){addActionCard('⚠️ No student found matching "'+esc(act.studentQuery)+'"','error-card');break;}
+      if(found.length===1){
+        const s=found[0];
+        window._pendingPinReset={id:s.id,schoolId:s._schoolId,name:s.name||s.id,acc:s.accountNo||s.id};
+        openModal(`<div class="modal-title">🔓 Reset Student PIN</div><p style="font-size:.86rem;color:var(--text2);margin-bottom:18px;line-height:1.65">Reset PIN for <strong>${esc(s.name||s.id)}</strong> (${esc(s.accountNo||s.id)})? Student will set a new PIN on next login.</p><div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="closeModal();confirmPendingPinReset()">Reset PIN</button></div>`);
+        addActionCard('🔓 PIN reset dialog opened for <strong>'+esc(s.name||s.id)+'</strong> — confirm in dialog.','info');
+      } else {
+        const rows=found.map(s=>`<tr><td>${esc(s.name||'—')}</td><td style="font-family:var(--mono);font-size:.78rem">${esc(s.accountNo||s.id)}</td><td>${esc(s._schoolName||'—')}</td><td><button class="row-btn" onclick="confirmResetPin('${s.id}','${s._schoolId}','${esc(s.name||s.id)}','${esc(s.accountNo||s.id)}')">Reset PIN</button></td></tr>`).join('');
+        addActionCard('<div style="padding:10px 14px;font-size:.8rem;font-weight:700;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">🔓 Multiple matches — choose one</div><div style="overflow-x:auto"><table class="ai-action-table"><thead><tr><th>Name</th><th>Account</th><th>School</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div>','table-card-ai');
+      }
+      break;
+    }
+
+    default:
+      addActionCard('⚠️ Unknown action: '+esc(act.type),'error-card');
+  }
+}
+
+async function confirmPendingBroadcast(){
+  const p=window._pendingAiBroadcast||{};
+  if(!p.title){toast('No pending broadcast','error');return;}
+  await executeBroadcastFromAi(p.title,p.body||'',p.msgType||'info');
+  window._pendingAiBroadcast=null;
+}
+
+async function confirmPendingPinReset(){
+  const p=window._pendingPinReset||{};
+  if(!p.id){toast('No pending PIN reset','error');return;}
+  await executeResetPin(p.id,p.schoolId,p.name,p.acc);
+  window._pendingPinReset=null;
+}
+
+async function executeBroadcastFromAi(title,body,msgType){
+  try{
+    const payload={title,body:body||'',type:msgType||'info',postedBy:S.user.uid,postedByName:'Super Admin (AI)',createdAt:firebase.firestore.FieldValue.serverTimestamp(),source:'ai'};
+    const batch=db.batch();
+    S.schools.forEach(school=>{ const ref=db.collection('schools').doc(school.id).collection('announcements').doc(); batch.set(ref,payload); });
+    await batch.commit();
+    await db.collection('devAuditLog').add({action:'aiBroadcast',title,type:msgType,schoolCount:S.schools.length,source:'ai',by:S.user.email,at:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('✅ Broadcast sent to '+S.schools.length+' schools','success');
+    addActionCard(`✅ Broadcast "<strong>${esc(title)}</strong>" sent to <strong>${S.schools.length} schools</strong> successfully!`,'success');
+  }catch(e){
+    toast('Broadcast error: '+e.message,'error');
+    addActionCard('⚠️ Broadcast failed: '+esc(e.message),'error-card');
+  }
+}
+
+function addActionCard(html,style){
+  const msgs=document.getElementById('ai-messages'); if(!msgs)return;
+  const div=document.createElement('div');
+  div.className='ai-action-card '+(style||'info');
+  div.innerHTML=html;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+</script>
+</body>
+</html>

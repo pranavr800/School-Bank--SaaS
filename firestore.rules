@@ -1,0 +1,197 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── HELPERS ────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isAnonymous() {
+      return request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+    function isNotAnonymous() {
+      return isSignedIn() && !isAnonymous();
+    }
+    function isSuperAdmin() {
+      return isNotAnonymous() &&
+        exists(/databases/$(database)/documents/superAdmins/$(request.auth.uid));
+    }
+    // Uses exists() (cheaper than get()) for read checks
+    function isTeacherOf(schoolCode) {
+      return isNotAnonymous() &&
+        exists(/databases/$(database)/documents/schools/$(schoolCode)/teachers/$(request.auth.uid));
+    }
+    // Uses get() only where role must be checked
+    function getTeacherData(schoolCode) {
+      return get(/databases/$(database)/documents/schools/$(schoolCode)/teachers/$(request.auth.uid)).data;
+    }
+    function isManagerOf(schoolCode) {
+      return isTeacherOf(schoolCode) && getTeacherData(schoolCode).role == 'manager';
+    }
+    function isActiveTeacher(schoolCode) {
+      return isTeacherOf(schoolCode) && getTeacherData(schoolCode).status != 'removed';
+    }
+    // Student owns this record (anon auth with anonUid stored on doc)
+    function isOwningStudent() {
+      return isSignedIn() && isAnonymous() &&
+        resource.data.anonUid == request.auth.uid;
+    }
+    // Student can only update PIN hash and their own anonUid
+    function isStudentSelfUpdate() {
+      return isSignedIn() && isAnonymous() &&
+        resource.data.anonUid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['studentPinHash', 'anonUid']);
+    }
+    // Safe amount: positive number, max 1,000,000
+    function isValidAmount(amt) {
+      return amt is number && amt > 0 && amt <= 1000000;
+    }
+
+    // ─── USERS COLLECTION ───────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if request.auth.uid == uid || isSuperAdmin();
+      // Only the user themselves can create their own doc (during registration)
+      allow create: if request.auth.uid == uid && isNotAnonymous();
+      // Only schoolName + role updates allowed post-creation
+      allow update: if request.auth.uid == uid && isNotAnonymous() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['schoolName', 'role', 'name']);
+      allow delete: if false;
+    }
+
+    // ─── SCHOOLS TOP-LEVEL ──────────────────────────────────────────
+    match /schools/{schoolCode} {
+      // Active teachers of this school can read the school doc
+      allow read: if isActiveTeacher(schoolCode) || isSuperAdmin();
+      // Only managers can update school metadata
+      allow update: if isManagerOf(schoolCode) || isSuperAdmin();
+      // Creation only happens during registration (teacher creates their own school)
+      allow create: if isNotAnonymous();
+      allow delete: if isSuperAdmin();
+
+      // ── STUDENTS ──────────────────────────────────────────────────
+      match /students/{studentId} {
+        allow read: if isActiveTeacher(schoolCode)
+          || isSuperAdmin()
+          || isOwningStudent();
+        // Anonymous students querying by accountNumber (for login)
+        // We allow list queries for anon auth with strict field filter enforced by app
+        allow list: if isActiveTeacher(schoolCode)
+          || isSuperAdmin()
+          || (isSignedIn() && isAnonymous());
+        allow create: if isActiveTeacher(schoolCode) || isSuperAdmin();
+        allow update: if isActiveTeacher(schoolCode)
+          || isSuperAdmin()
+          || isStudentSelfUpdate();
+        // Only managers can delete students (irreversible)
+        allow delete: if isManagerOf(schoolCode) || isSuperAdmin();
+      }
+
+      // ── TRANSACTIONS ──────────────────────────────────────────────
+      match /transactions/{txnId} {
+        allow read: if isActiveTeacher(schoolCode)
+          || isSuperAdmin()
+          // Student can read their own transactions
+          || (isSignedIn() && isAnonymous() &&
+              resource.data.studentId ==
+                get(/databases/$(database)/documents/schools/$(schoolCode)/students/$(resource.data.studentId)).data.anonUid);
+        allow list: if isActiveTeacher(schoolCode) || isSuperAdmin()
+          || (isSignedIn() && isAnonymous());
+        allow create: if isActiveTeacher(schoolCode)
+          && isValidAmount(request.resource.data.amount)
+          && request.resource.data.type in ['deposit', 'withdrawal']
+          && request.resource.data.createdBy == request.auth.uid
+          || isSuperAdmin();
+        // Transactions are immutable — no updates allowed
+        allow update: if false;
+        // Only managers can delete transactions (with audit trail requirement)
+        allow delete: if isManagerOf(schoolCode) || isSuperAdmin();
+      }
+
+      // ── TEACHERS ─────────────────────────────────────────────────
+      match /teachers/{teacherId} {
+        allow read: if isActiveTeacher(schoolCode) || isSuperAdmin();
+        // Any authenticated (non-anon) user can create a teacher doc for themselves
+        // This covers the join-school flow
+        allow create: if isNotAnonymous() && request.auth.uid == teacherId;
+        // Teachers can update their own doc (PIN hash, etc); managers can update any
+        allow update: if (isNotAnonymous() && request.auth.uid == teacherId
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['teacherPinHash', 'name']))
+          || isManagerOf(schoolCode)
+          || isSuperAdmin();
+        allow delete: if isManagerOf(schoolCode) || isSuperAdmin();
+      }
+
+      // ── DELETED AUDIT LOG ─────────────────────────────────────────
+      match /deletedAudit/{docId} {
+        allow read: if isManagerOf(schoolCode) || isSuperAdmin();
+        allow create: if isActiveTeacher(schoolCode) || isSuperAdmin();
+        allow update, delete: if false;
+      }
+
+      // ── ARCHIVES ─────────────────────────────────────────────────
+      match /archives/{year} {
+        allow read: if isActiveTeacher(schoolCode) || isSuperAdmin();
+        allow write: if isManagerOf(schoolCode) || isSuperAdmin();
+        match /students/{studentId} {
+          allow read: if isActiveTeacher(schoolCode) || isSuperAdmin();
+          allow write: if isManagerOf(schoolCode) || isSuperAdmin();
+        }
+        match /transactions/{txnId} {
+          allow read: if isActiveTeacher(schoolCode) || isSuperAdmin();
+          allow write: if isManagerOf(schoolCode) || isSuperAdmin();
+        }
+      }
+
+      // ── FEE RECORDS ──────────────────────────────────────────────
+      match /fees/{feeId} {
+        allow read: if isActiveTeacher(schoolCode)
+          || isSuperAdmin()
+          || isOwningStudent();
+        allow write: if isActiveTeacher(schoolCode) || isSuperAdmin();
+      }
+
+      // ── ANNOUNCEMENTS ─────────────────────────────────────────────
+      match /announcements/{annoId} {
+        allow read: if isActiveTeacher(schoolCode)
+          || isSuperAdmin()
+          || (isSignedIn() && isAnonymous());
+        allow write: if isManagerOf(schoolCode) || isSuperAdmin();
+      }
+    }
+
+    // ─── SUPER ADMINS ────────────────────────────────────────────────
+    match /superAdmins/{uid} {
+      allow read: if request.auth.uid == uid;
+      allow write: if request.auth.uid == uid;
+    }
+
+    // ─── GLOBAL ANNOUNCEMENTS ───────────────────────────────────────
+    match /announcements/{annoId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // ─── DEV AUDIT LOG ──────────────────────────────────────────────
+    match /devAuditLog/{docId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update, delete: if false;
+    }
+
+    // ─── BACKUPS ────────────────────────────────────────────────────
+    match /backups/{backupId} {
+      allow read, write: if isSuperAdmin();
+      match /{sub=**} {
+        allow read, write: if isSuperAdmin();
+      }
+    }
+
+    // ─── DENY ALL ELSE ───────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
