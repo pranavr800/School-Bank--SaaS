@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: exampleuser
+      POSTGRES_PASSWORD: examplepass
+      POSTGRES_DB: exampledb
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      DB_HOST: db
+      DB_USER: exampleuser
+      DB_PASS: examplepass
+      DB_NAME: exampledb
+    depends_on:
+      - db
+
+volumes:
+  db_data:
